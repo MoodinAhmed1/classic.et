@@ -1,5 +1,7 @@
 # Node modules
 node_modules/
+front-end/node_modules/
+back-end/node_modules/
 **/node_modules/
 
 # Logs
@@ -27,6 +29,8 @@ Thumbs.db
 # Env files
 .env
 .env.*
+front-end/.env.local
+back-end/.env.local
 
 # IDE files
 .vscode/
@@ -45,12 +49,7 @@ coverage/
 *.bak
 *.backup
 
-# Local config
-front-end/.env.local
-back-end/.env.local
-
 # Others
-*.log
 *.pid
 *.seed
 *.pid.lock
