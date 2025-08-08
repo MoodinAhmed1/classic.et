@@ -1,34 +1,30 @@
 'use client';
 
-import { useAuth } from '@/contexts/auth-context';
-import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
-import { Loader2 } from 'lucide-react';
+import { useAuth } from '@/contexts/auth-context';
+import { useRouter, usePathname } from 'next/navigation';
 
-interface ProtectedRouteProps {
-  children: React.ReactNode;
-}
-
-export function ProtectedRoute({ children }: ProtectedRouteProps) {
+export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
-    if (!loading && !user) {
-      router.push('/login');
+    if (!loading && !user && pathname?.startsWith('/dashboard')) {
+      router.replace('/login');
     }
-  }, [user, loading, router]);
+  }, [user, loading, router, pathname]);
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin" />
+      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 dark:from-slate-900 dark:via-purple-900 dark:to-slate-900">
+        <div className="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-blue-600"></div>
       </div>
     );
   }
 
-  if (!user) {
-    return null;
+  if (!user && pathname?.startsWith('/dashboard')) {
+    return null; // Will redirect in useEffect
   }
 
   return <>{children}</>;

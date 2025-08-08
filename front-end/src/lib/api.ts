@@ -11,12 +11,10 @@ async function apiRequest<T>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> {
-  const token = localStorage.getItem('auth_token');
-  
   const config: RequestInit = {
+    credentials: 'include', // Critical: enables cookies to be sent/received
     headers: {
       'Content-Type': 'application/json',
-      ...(token && { Authorization: `Bearer ${token}` }),
       ...options.headers,
     },
     ...options,
@@ -32,38 +30,55 @@ async function apiRequest<T>(
   return response.json();
 }
 
-// Auth API
+// Auth API - Updated for cookie-based authentication
 export const authApi = {
   register: async (data: { email: string; password: string; name?: string }) => {
-    const result = await apiRequest<{ token: string; user: any }>('/api/auth/register', {
+    const result = await apiRequest<{ user: any }>('/api/auth/register', {
       method: 'POST',
       body: JSON.stringify(data),
     });
     
-    localStorage.setItem('auth_token', result.token);
+    // No need to store token - it's in HttpOnly cookie now
     return result;
   },
 
   login: async (data: { email: string; password: string }) => {
-    const result = await apiRequest<{ token: string; user: any }>('/api/auth/login', {
+    const result = await apiRequest<{ user: any }>('/api/auth/login', {
       method: 'POST',
       body: JSON.stringify(data),
     });
     
-    localStorage.setItem('auth_token', result.token);
+    // No need to store token - it's in HttpOnly cookie now
     return result;
   },
 
-  logout: () => {
-    localStorage.removeItem('auth_token');
+  logout: async () => {
+    await apiRequest<{ success: boolean }>('/api/auth/logout', {
+      method: 'POST',
+    });
+    // Cookie is cleared by server
   },
 
   getMe: async () => {
     return apiRequest<{ user: any }>('/api/auth/me');
   },
+
+  updateProfile: async (data: { name?: string; email?: string }) => {
+    return apiRequest<{ user: any; message: string }>('/api/auth/update-profile', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+
+  updatePassword: async (data: { currentPassword: string; newPassword: string }) => {
+    return apiRequest<{ message: string }>('/api/auth/update-password', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
 };
 
-// Links API
+// Links API - Updated to use cookie authentication
 export const linksApi = {
   create: async (data: {
     originalUrl: string;
@@ -145,9 +160,8 @@ export const linksApi = {
     }>(`/api/links/${id}/analytics?days=${days}`);
   },
 };
-// hello commit
 
-// Domains API
+// Domains API - Updated to use cookie authentication
 export const domainsApi = {
   create: async (data: { domain: string }) => {
     return apiRequest<{
@@ -171,6 +185,18 @@ export const domainsApi = {
         createdAt: string;
       }>;
     }>('/api/domains');
+  },
+
+  verify: async (id: string) => {
+    return apiRequest<{ success: boolean; message: string }>(`/api/domains/${id}/verify`, {
+      method: 'POST',
+    });
+  },
+
+  delete: async (id: string) => {
+    return apiRequest<{ success: boolean }>(`/api/domains/${id}`, {
+      method: 'DELETE',
+    });
   },
 };
 

@@ -1,5 +1,8 @@
+'use client';
+
 import { DashboardSidebar } from '@/components/dashboard-sidebar';
-import { ProtectedRoute } from '@/components/protected-route';
+import { DashboardHeader } from '@/components/dashboard-header';
+import  {ProtectedRoute}  from '@/components/protected-route';
 
 export default function DashboardLayout({
   children,
@@ -10,7 +13,11 @@ export default function DashboardLayout({
     <ProtectedRoute>
       <div className="flex h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 dark:from-slate-900 dark:via-purple-900 dark:to-slate-900 transition-colors duration-300">
         <DashboardSidebar />
-        <main className="flex-1 overflow-y-auto">
+        <main className="flex-1 overflow-y-auto relative">
+          {/* Profile Header - Positioned Absolutely */}
+          <DashboardHeader />
+          
+          {/* Main Content */}
           <div className="p-8">
             {children}
           </div>

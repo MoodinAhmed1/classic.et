@@ -13,6 +13,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { User, Mail, Shield, Bell, Globe, Key, Trash2, Save, Loader2, Crown, Zap } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/auth-context';
+import { authApi } from '@/lib/api';
 
 // Email validation function
 const isValidEmail = (email: string): boolean => {
@@ -67,29 +68,15 @@ export default function SettingsPage() {
 
     setIsProfileSaving(true);
     try {
-      // Make API call to update user profile
-      const response = await fetch('/api/auth/update-profile', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
-        },
-        body: JSON.stringify({
-          name: name.trim(),
-          email: email.trim(),
-          bio: bio.trim(),
-        }),
+      // Use the cookie-based API
+      const response = await authApi.updateProfile({
+        name: name.trim(),
+        email: email.trim(),
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to update profile');
-      }
-
-      const updatedUser = await response.json();
-      
       // Update the user in the auth context
-      if (updateUser) {
-        updateUser(updatedUser.user);
+      if (updateUser && response.user) {
+        updateUser(response.user);
       }
 
       toast({
@@ -128,22 +115,11 @@ export default function SettingsPage() {
 
     setIsPasswordSaving(true);
     try {
-      // Make API call to update password
-      const response = await fetch('/api/auth/update-password', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
-        },
-        body: JSON.stringify({
-          currentPassword,
-          newPassword,
-        }),
+      // Use the cookie-based API
+      await authApi.updatePassword({
+        currentPassword,
+        newPassword,
       });
-
-      if (!response.ok) {
-        throw new Error('Failed to update password');
-      }
 
       setCurrentPassword('');
       setNewPassword('');
@@ -208,9 +184,9 @@ export default function SettingsPage() {
 
   const getTierColor = (tier: string) => {
     switch (tier) {
-      case 'pro': return 'bg-blue-100 text-blue-800';
-      case 'premium': return 'bg-purple-100 text-purple-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'pro': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200';
+      case 'premium': return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200';
+      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200';
     }
   };
 
@@ -226,8 +202,8 @@ export default function SettingsPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">Settings</h1>
-        <p className="text-gray-600 mt-2">
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Settings</h1>
+        <p className="text-gray-600 dark:text-gray-400 mt-2">
           Manage your account settings and preferences
         </p>
       </div>
@@ -251,8 +227,8 @@ export default function SettingsPage() {
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="flex items-center space-x-4">
-                <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center">
-                  <User className="h-8 w-8 text-blue-600" />
+                <div className="w-20 h-20 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
+                  <User className="h-8 w-8 text-blue-600 dark:text-blue-400" />
                 </div>
                 <div>
                   <h3 className="text-lg font-medium">{user?.name || user?.email}</h3>
@@ -455,7 +431,7 @@ export default function SettingsPage() {
               <CardContent className="text-center py-12">
                 <Key className="h-12 w-12 mx-auto mb-4 text-gray-400" />
                 <h3 className="text-lg font-medium mb-2">API Access</h3>
-                <p className="text-gray-600 mb-6">
+                <p className="text-gray-600 dark:text-gray-400 mb-6">
                   API access is available for Pro and Premium users only.
                 </p>
                 <Button>
@@ -524,7 +500,7 @@ export default function SettingsPage() {
             <CardContent className="space-y-6">
               <div className="flex items-center justify-between p-4 border rounded-lg">
                 <div className="flex items-center space-x-4">
-                  <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                  <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
                     {getTierIcon(user?.tier || 'free')}
                   </div>
                   <div>

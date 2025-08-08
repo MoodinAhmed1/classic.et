@@ -1,6 +1,10 @@
+// Backend implementation for Hono with cookie-based authentication
+// This should be applied to your existing index.ts file
+
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { jwt, sign, verify } from 'hono/jwt';
+import { setCookie, getCookie, deleteCookie } from 'hono/cookie';
 import { UAParser } from 'ua-parser-js';
 
 interface Env {
@@ -34,14 +38,32 @@ interface Link {
 
 const app = new Hono<{ Bindings: Env }>();
 
-// CORS middleware
-app.use('*', cors({
-  origin: ['http://localhost:3000', 'https://your-domain.com'],
-  allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowHeaders: ['Content-Type', 'Authorization'],
-}));
+// Updated CORS middleware for cookie-based authentication
+app.use('*', async (c, next) => {
+  const origin = c.req.header('Origin') || '';
+  const allowedOrigins = [
+    'http://localhost:3000',
+    'https://your-frontend-domain.com', // Replace with your actual frontend domain
+    'https://linkshort.vercel.app' // Example production domain
+  ];
 
-// Utility functions
+  // Must allow exact origin (not *) for credentials to work
+  if (allowedOrigins.includes(origin)) {
+    c.header('Access-Control-Allow-Origin', origin);
+    c.header('Access-Control-Allow-Credentials', 'true');
+    c.header('Access-Control-Allow-Headers', 'Content-Type, X-CSRF-Token');
+    c.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
+  }
+
+  // Handle preflight requests
+  if (c.req.method === 'OPTIONS') {
+    return c.body('', 204);
+  }
+
+  await next();
+});
+
+// Utility functions (keep existing ones)
 function generateId(): string {
   return crypto.randomUUID();
 }
@@ -99,31 +121,34 @@ async function fetchPageTitle(url: string): Promise<string | null> {
   }
 }
 
-// Authentication middleware
+// Updated authentication middleware for cookie-based auth
 const authMiddleware = async (c: any, next: any) => {
-  const authHeader = c.req.header('Authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+  const token = getCookie(c, 'auth_token');
+  
+  if (!token) {
     return c.json({ error: 'Unauthorized' }, 401);
   }
-
-  const token = authHeader.split(' ')[1];
 
   try {
     const payload = await verify(token, c.env.JWT_SECRET);
     c.set('jwtPayload', payload);
     await next();
   } catch (err) {
-    return c.json({ error: 'Invalid token' }, 401);
+    return c.json({ error: 'Invalid or expired token' }, 401);
   }
 };
 
-// Auth routes
+// Updated Auth routes for cookie-based authentication
 app.post('/api/auth/register', async (c) => {
   try {
     const { email, password, name } = await c.req.json();
 
     if (!email || !password) {
       return c.json({ error: 'Email and password are required' }, 400);
+    }
+
+    if (password.length < 6) {
+      return c.json({ error: 'Password must be at least 6 characters long' }, 400);
     }
 
     // Check if user already exists
@@ -144,14 +169,22 @@ app.post('/api/auth/register', async (c) => {
       VALUES (?, ?, ?, ?, 'free')
     `).bind(userId, email, name || null, passwordHash).run();
 
-    // Generate JWT
+    // Generate JWT and set as HttpOnly cookie
     const token = await sign(
-      { userId, email, exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 7 },
+      { userId, email, exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 7 }, // 7 days
       c.env.JWT_SECRET
     );
 
+    // Set HttpOnly cookie
+    setCookie(c, 'auth_token', token, {
+      httpOnly: true,
+      secure: true, // Required for SameSite=None
+      sameSite: 'None', // Required for cross-domain
+      path: '/',
+      maxAge: 60 * 60 * 24 * 7, // 7 days
+    });
+
     return c.json({
-      token,
       user: { id: userId, email, name, tier: 'free' }
     });
 
@@ -178,14 +211,22 @@ app.post('/api/auth/login', async (c) => {
       return c.json({ error: 'Invalid credentials' }, 401);
     }
 
-    // Generate JWT
+    // Generate JWT and set as HttpOnly cookie
     const token = await sign(
       { userId: user.id, email: user.email, exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 7 },
       c.env.JWT_SECRET
     );
+
+    // Set HttpOnly cookie
+    setCookie(c, 'auth_token', token, {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'None',
+      path: '/',
+      maxAge: 60 * 60 * 24 * 7, // 7 days
+    });
  
     return c.json({
-      token,
       user: {
         id: user.id,
         email: user.email,
@@ -198,6 +239,20 @@ app.post('/api/auth/login', async (c) => {
     console.error('Login error:', error);
     return c.json({ error: 'Internal server error' }, 500);
   }
+});
+
+// New logout route
+app.post('/api/auth/logout', async (c) => {
+  // Clear the auth cookie
+  setCookie(c, 'auth_token', '', {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'None',
+    path: '/',
+    maxAge: 0, // Expire immediately
+  });
+
+  return c.json({ success: true });
 });
 
 app.get('/api/auth/me', authMiddleware, async (c) => {

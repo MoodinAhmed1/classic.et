@@ -1,14 +1,15 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState, ReactNode, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { authApi } from '@/lib/api';
-import { sessionStorage, SessionData } from '@/lib/session-storage';
+import { useRouter, usePathname } from 'next/navigation';
 
 interface User {
   id: string;
   email: string;
   name: string;
   tier: 'free' | 'pro' | 'premium';
+  createdAt: string;
 }
 
 interface AuthContextType {
@@ -16,8 +17,10 @@ interface AuthContextType {
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, name?: string) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
   updateUser: (user: User) => void;
+  updateProfile: (data: { name?: string; email?: string }) => Promise<void>;
+  updatePassword: (currentPassword: string, newPassword: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -25,112 +28,99 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [initialized, setInitialized] = useState(false);
+  const router = useRouter();
+  const pathname = usePathname();
 
+  // Check authentication status on mount
   useEffect(() => {
-    checkAuth();
-    
-    // Set up session refresh on user activity (debounced)
-    const handleActivity = () => {
-      if (refreshTimeoutRef.current) return;
-      
-      refreshTimeoutRef.current = setTimeout(() => {
-        refreshTimeoutRef.current = null;
-        if (sessionStorage.expiresWithin(60 * 60 * 1000)) { // Refresh if expiring within 1 hour
-          refreshSession();
-        }
-      }, 1000); // 1 second debounce
-    };
-
-    const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'];
-    events.forEach(event => document.addEventListener(event, handleActivity, true));
-
-    // Cross-tab synchronization
-    const onStorage = (event: StorageEvent) => {
-      if (event.key === 'auth_session') {
-        if (!event.newValue) {
-          setUser(null); // Session cleared (logged out) in another tab
-        } else {
-          const session = sessionStorage.getSession();
-          if (session) {
-            setUser(session.user);
-            localStorage.setItem('auth_token', session.token);
-          }
-        }
-      }
-    };
-    window.addEventListener('storage', onStorage);
-
-    return () => {
-      events.forEach(event => document.removeEventListener(event, handleActivity, true));
-      window.removeEventListener('storage', onStorage);
-      if (refreshTimeoutRef.current) {
-        clearTimeout(refreshTimeoutRef.current);
-      }
-    };
-  }, []);
+    if (!initialized) {
+      checkAuth();
+    }
+  }, [initialized]);
 
   const checkAuth = async () => {
     try {
-      const session = sessionStorage.getSession();
-      if (!session) {
-        setLoading(false);
-        return;
+      const response = await authApi.getMe();
+      setUser(response.user);
+      
+      // If user is authenticated and on login/register page, redirect to dashboard
+      if (response.user && (pathname === '/login' || pathname === '/register')) {
+        router.replace('/dashboard');
       }
-
-      // Set token for API calls
-      localStorage.setItem('auth_token', session.token);
-      setUser(session.user);
     } catch (error) {
-      sessionStorage.clearSession();
+      // User not authenticated - this is expected for public pages
+      setUser(null);
+      
+      // Only redirect to login if user is on a protected route
+      const isProtectedRoute = pathname?.startsWith('/dashboard');
+      if (isProtectedRoute && pathname !== '/login') {
+        router.replace('/login');
+      }
     } finally {
       setLoading(false);
-    }
-  };
-
-  const refreshSession = async () => {
-    try {
-      const session = sessionStorage.getSession();
-      if (!session) return;
-
-      const { user: refreshedUser } = await authApi.getMe();
-      sessionStorage.setSession(session.token, refreshedUser);
-      setUser(refreshedUser);
-    } catch (error) {
-      logout();
+      setInitialized(true);
     }
   };
 
   const login = async (email: string, password: string) => {
-    const { user, token } = await authApi.login({ email, password });
-    sessionStorage.setSession(token, user);
-    localStorage.setItem('auth_token', token);
-    setUser(user);
+    try {
+      const response = await authApi.login({ email, password });
+      setUser(response.user);
+      // Don't redirect here - let the calling component handle it
+    } catch (error) {
+      throw error; // Re-throw so the login component can handle it
+    }
   };
 
   const register = async (email: string, password: string, name?: string) => {
-    const { user, token } = await authApi.register({ email, password, name });
-    sessionStorage.setSession(token, user);
-    localStorage.setItem('auth_token', token);
-    setUser(user);
+    try {
+      const response = await authApi.register({ email, password, name });
+      setUser(response.user);
+      // Don't redirect here - let the calling component handle it
+    } catch (error) {
+      throw error; // Re-throw so the register component can handle it
+    }
   };
 
-  const logout = () => {
-    authApi.logout();
-    sessionStorage.clearSession();
-    setUser(null);
+  const logout = async () => {
+    try {
+      await authApi.logout();
+    } catch (error) {
+      // Even if logout fails on server, clear client state
+      console.error('Logout error:', error);
+    } finally {
+      setUser(null);
+      router.replace('/login');
+    }
   };
 
   const updateUser = (updatedUser: User) => {
     setUser(updatedUser);
-    const session = sessionStorage.getSession();
-    if (session) {
-      sessionStorage.setSession(session.token, updatedUser);
-    }
+  };
+
+  const updateProfile = async (data: { name?: string; email?: string }) => {
+    const response = await authApi.updateProfile(data);
+    setUser(response.user);
+  };
+
+  const updatePassword = async (currentPassword: string, newPassword: string) => {
+    await authApi.updatePassword({ currentPassword, newPassword });
+  };
+
+  const value = {
+    user,
+    loading,
+    login,
+    register,
+    logout,
+    updateUser,
+    updateProfile,
+    updatePassword,
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, updateUser }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );
