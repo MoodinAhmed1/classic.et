@@ -102,7 +102,7 @@ export default function LinkDetailsPage() {
     setIsSaving(true);
     try {
       await linksApi.update(linkId, {
-        title: editTitle.trim() || null,
+        title: editTitle.trim() || "",
         isActive: editIsActive,
         expiresAt: editExpiresAt ? new Date(editExpiresAt).toISOString() : null,
       });

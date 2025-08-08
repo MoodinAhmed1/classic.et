@@ -30,7 +30,7 @@ async function apiRequest<T>(
   return response.json();
 }
 
-// Auth API - Updated for cookie-based authentication
+// Auth API - Updated for cookie-based authentication with password reset
 export const authApi = {
   register: async (data: { email: string; password: string; name?: string }) => {
     const result = await apiRequest<{ user: any }>('/api/auth/register', {
@@ -38,7 +38,6 @@ export const authApi = {
       body: JSON.stringify(data),
     });
     
-    // No need to store token - it's in HttpOnly cookie now
     return result;
   },
 
@@ -48,7 +47,6 @@ export const authApi = {
       body: JSON.stringify(data),
     });
     
-    // No need to store token - it's in HttpOnly cookie now
     return result;
   },
 
@@ -56,9 +54,23 @@ export const authApi = {
     await apiRequest<{ success: boolean }>('/api/auth/logout', {
       method: 'POST',
     });
-    // Cookie is cleared by server
   },
 
+  forgotPassword: async (data: { email: string }) => {
+    console.log('Sending forgot password request for email:', data.email);
+    return apiRequest<{ success: boolean; message: string; debug?: any }>('/api/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  resetPassword: async (data: { token: string; password: string }) => {
+    return apiRequest<{ success: boolean; message: string }>('/api/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+  
   getMe: async () => {
     return apiRequest<{ user: any }>('/api/auth/me');
   },
