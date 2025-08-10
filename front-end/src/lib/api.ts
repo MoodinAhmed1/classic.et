@@ -7,6 +7,31 @@ class ApiError extends Error {
   }
 }
 
+interface RegisterResponse {
+  success: boolean;
+  message: string;
+  user: {
+    id: string;
+    email: string;
+    name: string | null;
+    tier: 'free' | 'pro' | 'premium';
+    emailVerified: boolean;
+  };
+  requiresVerification: boolean;
+}
+
+interface VerificationResponse {
+  success: boolean;
+  message: string;
+  user: {
+    id: string;
+    email: string;
+    name: string | null;
+    tier: 'free' | 'pro' | 'premium';
+    emailVerified: boolean;
+  };
+}
+
 async function apiRequest<T>(
   endpoint: string,
   options: RequestInit = {}
@@ -19,12 +44,20 @@ async function apiRequest<T>(
     },
     ...options,
   };
- 
+
   const response = await fetch(`${API_BASE_URL}${endpoint}`, config);
-  
+
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: 'Unknown error' }));
-    throw new ApiError(response.status, error.error || 'Request failed');
+    const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+    const apiError = new ApiError(response.status, errorData.error || 'Request failed');
+
+    // Add custom flags if present in the error response
+    if (errorData.requiresVerification) {
+      (apiError as any).requiresVerification = true;
+      (apiError as any).email = errorData.email;
+    }
+
+    throw apiError;
   }
 
   return response.json();
@@ -33,12 +66,29 @@ async function apiRequest<T>(
 // Auth API - Updated for cookie-based authentication with password reset
 export const authApi = {
   register: async (data: { email: string; password: string; name?: string }) => {
-    const result = await apiRequest<{ user: any }>('/api/auth/register', {
+    const result = await apiRequest<RegisterResponse>('/api/auth/register', {
       method: 'POST',
       body: JSON.stringify(data),
     });
     
     return result;
+  },
+ 
+  verifyEmail: async (data : {email: string, code: string}) => {
+    return apiRequest<VerificationResponse>('/api/auth/verify-email', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  resendVerification: async ({ email }: { email: string }) => {
+    return apiRequest<{ success: boolean; message: string }>(
+      '/api/auth/resend-verification',
+      {
+        method: 'POST',
+        body: JSON.stringify({ email }),
+      }
+    );
   },
 
   login: async (data: { email: string; password: string }) => {

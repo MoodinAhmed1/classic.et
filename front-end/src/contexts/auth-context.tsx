@@ -11,16 +11,16 @@ interface User {
   tier: 'free' | 'pro' | 'premium';
   createdAt: string;
 }
-
+ 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string, name?: string) => Promise<void>;
   logout: () => Promise<void>;
   updateUser: (user: User) => void;
   updateProfile: (data: { name?: string; email?: string }) => Promise<void>;
   updatePassword: (currentPassword: string, newPassword: string) => Promise<void>;
+  checkAuth: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -73,16 +73,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const register = async (email: string, password: string, name?: string) => {
-    try {
-      const response = await authApi.register({ email, password, name });
-      setUser(response.user);
-      // Don't redirect here - let the calling component handle it
-    } catch (error) {
-      throw error; // Re-throw so the register component can handle it
-    }
-  };
-
   const logout = async () => {
     try {
       await authApi.logout();
@@ -112,11 +102,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     user,
     loading,
     login,
-    register,
     logout,
     updateUser,
     updateProfile,
     updatePassword,
+    checkAuth,
   };
 
   return (

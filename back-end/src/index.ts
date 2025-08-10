@@ -11,6 +11,8 @@ interface Env {
   DB: D1Database;
   JWT_SECRET: string;
   RESEND_API_KEY: string;
+  FRONTEND_URL: string;
+  FROM_EMAIL: string; // Optional, can be set to a verified domain email
 }
 
 interface User {
@@ -131,6 +133,12 @@ function generateResetToken(): string {
   return result;
 }
 
+
+function generateVerificationCode(): string {
+// Generate a 6-digit verification code
+return Math.floor(100000 + Math.random() * 900000).toString();
+}
+
 async function sendPasswordResetEmail(
   email: string, 
   resetToken: string, 
@@ -138,17 +146,8 @@ async function sendPasswordResetEmail(
   resendApiKey: string, 
   userName?: string
 ) {
-  console.log('=== RESEND EMAIL SENDING DEBUG ===');
-  console.log('Email:', email);
-  console.log('Reset token:', resetToken);
-  console.log('Frontend URL:', frontendUrl);
-  console.log('API Key present:', !!resendApiKey);
-  console.log('API Key length:', resendApiKey?.length || 0);
-  console.log('User name:', userName);
-
   const resetUrl = `${frontendUrl}/reset-password?token=${resetToken}`;
-  console.log('Reset URL:', resetUrl);
-  
+
   // Use a verified sender domain - IMPORTANT: Replace with your verified domain
   const fromEmail = 'onboarding@resend.dev'; // This is Resend's test domain
   // For production, use: 'noreply@yourdomain.com' (must be verified in Resend)
@@ -460,37 +459,37 @@ async function sendPasswordResetEmail(
       </html>
     `,
     text: `
-Hi ${userName || 'there'}!
+      Hi ${userName || 'there'}!
 
-You recently requested to reset your password for your LinkShort account.
+      You recently requested to reset your password for your LinkShort account.
 
-To reset your password, click the following link:
-${resetUrl}
+      To reset your password, click the following link:
+      ${resetUrl}
 
-IMPORTANT SECURITY INFORMATION:
-- This link will expire in 1 hour for your security
-- If you didn't request this password reset, please ignore this email
-- Never share this link with anyone
-- This link can only be used once
-- Our team will never ask for your password via email
+      IMPORTANT SECURITY INFORMATION:
+      - This link will expire in 1 hour for your security
+      - If you didn't request this password reset, please ignore this email
+      - Never share this link with anyone
+      - This link can only be used once
+      - Our team will never ask for your password via email
 
-PASSWORD SECURITY BEST PRACTICES:
-- Use at least 8 characters with a mix of letters, numbers, and symbols
-- Avoid using personal information like names, birthdays, or addresses
-- Don't reuse passwords from other websites or services
-- Consider using a password manager to generate and store secure passwords
-- Enable two-factor authentication when available for extra security
-- Update your passwords regularly, especially for important accounts
+      PASSWORD SECURITY BEST PRACTICES:
+      - Use at least 8 characters with a mix of letters, numbers, and symbols
+      - Avoid using personal information like names, birthdays, or addresses
+      - Don't reuse passwords from other websites or services
+      - Consider using a password manager to generate and store secure passwords
+      - Enable two-factor authentication when available for extra security
+      - Update your passwords regularly, especially for important accounts
 
-If you have any questions or concerns about your account security, please contact our support team.
+      If you have any questions or concerns about your account security, please contact our support team.
 
-Best regards,
-The LinkShort Team
+      Best regards,
+      The LinkShort Team
 
-This email was sent to ${email}
-© 2024 LinkShort. All rights reserved.
+      This email was sent to ${email}
+      © 2024 LinkShort. All rights reserved.
 
-This is an automated message. Please do not reply to this email.
+      This is an automated message. Please do not reply to this email.
     `
   };
 
@@ -552,6 +551,680 @@ This is an automated message. Please do not reply to this email.
   }
 }
 
+// async function sendEmailVerification(
+//   email: string, 
+//   verificationToken: string,
+//   frontendUrl: string,
+//   resendApiKey: string
+// ) {
+//   const verificationUrl = `${frontendUrl}/verify-email?token=${verificationToken}`;
+
+//   const fromEmail = 'onboarding@resend.dev';
+
+//   const emailData = {
+//     from: `LinkShort <${fromEmail}>`,
+//     to: [email],
+//     subject: 'Verify Your LinkShort Email',
+//     html: `
+//       <!DOCTYPE html>
+//       <html lang="en">
+//       <head>
+//         <meta charset="utf-8">
+//         <meta name="viewport" content="width=device-width, initial-scale=1.0">
+//         <title>Verify Your Email - LinkShort</title>
+//         <style>
+//           body {
+//             font-family: Arial, sans-serif;
+//             background-color: #f4f4f4;
+//             color: #333;
+//             padding: 20px;
+//           }
+//           .email-container {
+//             max-width: 600px;
+//             margin: 0 auto;
+//             background: #fff;
+//             padding: 20px;
+//             border-radius: 8px;
+//             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+//           }
+//           .header {
+//             background: #4a90e2;
+//             color: #fff;
+//             padding: 20px;
+//             text-align: center;
+//             border-radius: 8px 8px 0 0;
+//           }
+//           .header h1 {
+//             margin: 0;
+//             font-size: 24px;
+//           }
+//           .content {
+//             padding: 20px;
+//           }
+//           .content p {
+//             font-size: 16px;
+//             line-height: 1.5;
+//           }
+//           .cta-button {
+//             display: inline-block;
+//             background: #4a90e2;
+//             color: #fff;
+//             padding: 10px 20px;
+//             text-decoration: none;
+//             border-radius: 5px;
+//             margin-top: 20px;
+//           }
+//           .footer {
+//             margin-top: 20px;
+//             font-size: 12px;
+//             color: #999;
+//             text-align: center;
+//           }
+//           .footer a {
+//             color: #4a90e2;
+//             text-decoration: none;
+//           }
+//           .footer a:hover {
+//             text-decoration: underline;
+//           }
+//         </style>
+//       </head>
+//       <body>
+//         <div class="email-container">
+//           <div class="header">
+//             <h1>Verify Your Email</h1>
+//           </div>
+//           <div class="content">
+//             <p>Hi there!</p>
+//             <p>Thank you for registering with LinkShort. To complete your registration, please verify your email address by clicking the button below:</p>
+//             <a href="${verificationUrl}" class="cta-button">Verify Email</a>
+//             <p>If the button above doesn't work, copy and paste this link into your browser:</p>
+//             <p><a href="${verificationUrl}">${verificationUrl}</a></p>
+//             <p>If you did not create an account, you can safely ignore this email.</p>
+//             <p>Thank you for choosing LinkShort!</p>
+//           </div>
+//           <div class="footer">
+//             <p>&copy; 2024 LinkShort. All rights reserved.</p>
+//             <p><a href="${frontendUrl}">Visit our website</a></p>
+//           </div>
+//         </div>
+//       </body>
+//       </html>
+//     `,
+//     text: `
+//       Hi there!
+
+//       Thank you for registering with LinkShort. To complete your registration, please verify your email address by clicking the link below:
+
+//       ${verificationUrl}
+
+//       If you did not create an account, you can safely ignore this email.
+
+//       Thank you for choosing LinkShort!
+
+//       © 2024 LinkShort. All rights reserved.
+//       Visit our website: ${frontendUrl}
+//     `
+//   };
+//   try {
+//     const response = await fetch('https://api.resend.com/emails', {
+//       method: 'POST',
+//       headers: {
+//         'Authorization': `Bearer ${resendApiKey}`,
+//         'Content-Type': 'application/json'
+//       },
+//       body: JSON.stringify(emailData)
+//     });
+//     if (!response.ok) {
+//       const errorData = await response.json();
+//       throw new Error(`Failed to send verification email: ${errorData.error || 'Unknown error'}`);
+//     }
+//     const result: any = await response.json();
+//     if(result){
+//       return { success: true, id: result.id };
+//     }
+//   } catch (error) {
+//     throw new Error(`Failed to send verification email: ${error.message}`);
+//   }
+// }
+
+async function sendVerificationEmail(
+  email: string, 
+  verificationCode: string, 
+  frontendUrl: string, 
+  resendApiKey: string, 
+  fromEmail?: string,
+  userName?: string
+) {
+  console.log('=== VERIFICATION EMAIL SENDING DEBUG ===');
+  console.log('Email:', email);
+  console.log('Verification code:', verificationCode);
+  console.log('Frontend URL:', frontendUrl);
+  console.log('API Key present:', !!resendApiKey);
+  console.log('From email:', fromEmail);
+  console.log('User name:', userName);
+
+  const verificationUrl = `${frontendUrl}/verify-email?code=${verificationCode}&email=${encodeURIComponent(email)}`;
+  console.log('Verification URL:', verificationUrl);
+  
+  // Determine sender email based on domain verification status
+  let senderEmail: string;
+  let senderName = 'LinkShort';
+  
+  if (fromEmail) {
+    // Use custom verified domain email
+    senderEmail = fromEmail;
+    console.log('Using custom verified sender email:', senderEmail);
+  } else {
+    // Use Resend's test domain (only works for sending to your own email)
+    senderEmail = 'onboarding@resend.dev';
+    console.log('Using Resend test domain (limited to your own email):', senderEmail);
+  }
+  
+  const emailData = {
+    from: `${senderName} <${senderEmail}>`,
+    to: [email],
+    subject: 'Verify Your LinkShort Account - Welcome!',
+    html: `
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Verify Your Email - LinkShort</title>
+        <style>
+          * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+          }
+          
+          body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333333;
+            background-color: #f8fafc;
+            padding: 20px;
+          }
+          
+          .email-container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: #ffffff;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+          }
+          
+          .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px 30px;
+            text-align: center;
+          }
+          
+          .logo {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            font-size: 28px;
+            font-weight: bold;
+            margin-bottom: 16px;
+          }
+          
+          .header-title {
+            font-size: 24px;
+            font-weight: 600;
+            margin: 0;
+            opacity: 0.95;
+          }
+          
+          .content {
+            padding: 40px 30px;
+          }
+          
+          .greeting {
+            font-size: 20px;
+            font-weight: 600;
+            color: #1f2937;
+            margin-bottom: 20px;
+          }
+          
+          .message {
+            font-size: 16px;
+            color: #4b5563;
+            margin-bottom: 32px;
+            line-height: 1.7;
+          }
+          
+          .verification-code-container {
+            text-align: center;
+            margin: 40px 0;
+            padding: 30px;
+            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+            border-radius: 16px;
+            border: 2px solid #0ea5e9;
+          }
+          
+          .verification-code-label {
+            font-size: 14px;
+            font-weight: 600;
+            color: #0c4a6e;
+            margin-bottom: 16px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+          }
+          
+          .verification-code {
+            font-size: 36px;
+            font-weight: bold;
+            color: #0369a1;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            letter-spacing: 8px;
+            margin: 16px 0;
+            padding: 16px 24px;
+            background: white;
+            border-radius: 12px;
+            border: 2px solid #0ea5e9;
+            display: inline-block;
+            box-shadow: 0 4px 12px rgba(14, 165, 233, 0.2);
+          }
+          
+          .verification-note {
+            font-size: 14px;
+            color: #0c4a6e;
+            margin-top: 16px;
+          }
+          
+          .cta-container {
+            text-align: center;
+            margin: 40px 0;
+          }
+          
+          .cta-button {
+            display: inline-block;
+            background: #3b82f6;
+            color: white !important;
+            padding: 16px 32px;
+            text-decoration: none;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 16px;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+          }
+          
+          .cta-button:hover {
+            background: #2563eb;
+            transform: translateY(-1px);
+            box-shadow: 0 6px 16px rgba(59, 130, 246, 0.4);
+          }
+          
+          .backup-link {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 16px;
+            margin: 24px 0;
+            word-break: break-all;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 14px;
+            color: #475569;
+          }
+          
+          .info-box {
+            background: #f0fdf4;
+            border: 1px solid #22c55e;
+            border-left: 4px solid #22c55e;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 24px 0;
+          }
+          
+          .info-title {
+            font-weight: 600;
+            color: #15803d;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+          }
+          
+          .info-list {
+            color: #15803d;
+            font-size: 14px;
+            margin: 0;
+            padding-left: 20px;
+          }
+          
+          .info-list li {
+            margin: 6px 0;
+          }
+          
+          .warning-box {
+            background: #fef3c7;
+            border: 1px solid #f59e0b;
+            border-left: 4px solid #f59e0b;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 24px 0;
+          }
+          
+          .warning-title {
+            font-weight: 600;
+            color: #92400e;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+          }
+          
+          .warning-list {
+            color: #92400e;
+            font-size: 14px;
+            margin: 0;
+            padding-left: 20px;
+          }
+          
+          .warning-list li {
+            margin: 6px 0;
+          }
+          
+          .footer {
+            background: #f8fafc;
+            padding: 30px;
+            text-align: center;
+            border-top: 1px solid #e2e8f0;
+            color: #64748b;
+            font-size: 14px;
+          }
+          
+          .footer-brand {
+            font-weight: 600;
+            color: #1f2937;
+            margin-bottom: 8px;
+          }
+          
+          .footer-note {
+            font-size: 12px;
+            color: #94a3b8;
+            margin-top: 16px;
+            line-height: 1.5;
+          }
+          
+          .divider {
+            height: 1px;
+            background: linear-gradient(to right, transparent, #e2e8f0, transparent);
+            margin: 32px 0;
+          }
+          
+          .domain-notice {
+            background: #f0f9ff;
+            border: 1px solid #0ea5e9;
+            border-left: 4px solid #0ea5e9;
+            border-radius: 8px;
+            padding: 16px;
+            margin: 20px 0;
+            font-size: 13px;
+            color: #0c4a6e;
+          }
+          
+          @media (max-width: 600px) {
+            body {
+              padding: 10px;
+            }
+            
+            .content {
+              padding: 30px 20px;
+            }
+            
+            .header {
+              padding: 30px 20px;
+            }
+            
+            .logo {
+              font-size: 24px;
+            }
+            
+            .header-title {
+              font-size: 20px;
+            }
+            
+            .verification-code {
+              font-size: 28px;
+              letter-spacing: 4px;
+              padding: 12px 16px;
+            }
+            
+            .cta-button {
+              padding: 14px 24px;
+              font-size: 15px;
+            }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="email-container">
+          <div class="header">
+            <div class="logo">
+              ⚡ LinkShort
+            </div>
+            <h1 class="header-title">Welcome to LinkShort!</h1>
+          </div>
+          
+          <div class="content">
+            <div class="greeting">Hi ${userName || 'there'}!</div>
+            
+            <div class="message">
+              Thank you for signing up for LinkShort! We're excited to have you on board. To complete your registration and start shortening URLs, please verify your email address using the verification code below.
+            </div>
+            
+            <div class="verification-code-container">
+              <div class="verification-code-label">Your Verification Code</div>
+              <div class="verification-code">${verificationCode}</div>
+              <div class="verification-note">
+                Enter this 6-digit code in the verification form to activate your account.
+              </div>
+            </div>
+            
+            <div class="message">
+              You can also click the button below to verify your email automatically:
+            </div>
+            
+            <div class="cta-container">
+              <a href="${verificationUrl}" class="cta-button">Verify Email Address</a>
+            </div>
+            
+            <p style="color: #6b7280; font-size: 14px; text-align: center; margin-bottom: 24px;">
+              If the button above doesn't work, copy and paste this link into your browser:
+            </p>
+            
+            <div class="backup-link">
+              ${verificationUrl}
+            </div>
+            
+            ${!fromEmail ? `
+            <div class="domain-notice">
+              <strong>📧 Email Delivery Notice:</strong> This email was sent using Resend's test domain. 
+              For production use, the sender should verify a custom domain at resend.com/domains to ensure 
+              reliable delivery to all recipients.
+            </div>
+            ` : ''}
+            
+            <div class="info-box">
+              <div class="info-title">
+                🎉 What's Next?
+              </div>
+              <ul class="info-list">
+                <li>Verify your email using the code above</li>
+                <li>Start creating short links for your URLs</li>
+                <li>Track clicks and analytics for your links</li>
+                <li>Customize your links with custom codes</li>
+                <li>Manage all your links from the dashboard</li>
+              </ul>
+            </div>
+            
+            <div class="warning-box">
+              <div class="warning-title">
+                🔒 Important Security Information
+              </div>
+              <ul class="warning-list">
+                <li>This verification code will expire in <strong>15 minutes</strong> for security</li>
+                <li>If you didn't create this account, please ignore this email</li>
+                <li>Never share this verification code with anyone</li>
+                <li>This code can only be used once</li>
+                <li>Our team will never ask for your verification code via email or phone</li>
+              </ul>
+            </div>
+            
+            <div class="divider"></div>
+            
+            <div class="message" style="margin-top: 32px;">
+              If you have any questions or need help getting started, please don't hesitate to contact our support team. We're here to help you make the most of LinkShort!
+            </div>
+            
+            <p style="margin-top: 32px; color: #374151;">
+              Welcome aboard!<br>
+              <strong>The LinkShort Team</strong>
+            </p>
+          </div>
+          
+          <div class="footer">
+            <div class="footer-brand">LinkShort</div>
+            <div>This email was sent to <strong>${email}</strong></div>
+            <div style="margin: 8px 0;">© 2024 LinkShort. All rights reserved.</div>
+            <div class="footer-note">
+              This is an automated message. Please do not reply to this email. If you're having trouble with the verification button, copy and paste the URL into your web browser.
+            </div>
+          </div>
+        </div>
+      </body>
+      </html>
+    `,
+    text: `
+Welcome to LinkShort!
+
+Hi ${userName || 'there'}!
+
+Thank you for signing up for LinkShort! We're excited to have you on board. To complete your registration and start shortening URLs, please verify your email address using the verification code below.
+
+YOUR VERIFICATION CODE: ${verificationCode}
+
+Enter this 6-digit code in the verification form to activate your account.
+
+You can also verify your email by visiting this link:
+${verificationUrl}
+
+${!fromEmail ? `
+EMAIL DELIVERY NOTICE: This email was sent using Resend's test domain. For production use, the sender should verify a custom domain at resend.com/domains to ensure reliable delivery to all recipients.
+` : ''}
+
+WHAT'S NEXT:
+- Verify your email using the code above
+- Start creating short links for your URLs
+- Track clicks and analytics for your links
+- Customize your links with custom codes
+- Manage all your links from the dashboard
+
+IMPORTANT SECURITY INFORMATION:
+- This verification code will expire in 15 minutes for security
+- If you didn't create this account, please ignore this email
+- Never share this verification code with anyone
+- This code can only be used once
+- Our team will never ask for your verification code via email or phone
+
+If you have any questions or need help getting started, please contact our support team.
+
+Welcome aboard!
+The LinkShort Team
+
+This email was sent to ${email}
+© 2024 LinkShort. All rights reserved.
+
+This is an automated message. Please do not reply to this email.
+    `
+  };
+
+  console.log('Email data prepared:', {
+    from: emailData.from,
+    to: emailData.to,
+    subject: emailData.subject,
+    htmlLength: emailData.html.length,
+    textLength: emailData.text.length
+  });
+
+  try {
+    console.log('Making request to Resend API...');
+    
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${resendApiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(emailData)
+    });
+
+    console.log('Resend API response status:', response.status);
+    console.log('Resend API response headers:', Object.fromEntries(response.headers.entries()));
+
+    const responseText = await response.text();
+    console.log('Resend API response body:', responseText);
+
+    if (!response.ok) {
+      console.error('Resend API Error Details:', {
+        status: response.status,
+        statusText: response.statusText,
+        body: responseText
+      });
+      
+      let errorMessage = `Resend API Error: ${response.status}`;
+      let errorDetails = '';
+      
+      try {
+        const errorData = JSON.parse(responseText);
+        errorMessage = errorData.message || errorData.error || errorMessage;
+        
+        // Handle specific domain verification errors
+        if (errorData.message && errorData.message.includes('domain')) {
+          errorDetails = 'Domain verification required. Please verify your domain at resend.com/domains';
+        }
+      } catch (e) {
+        // Response is not JSON, use the text
+        errorMessage = responseText || errorMessage;
+      }
+      
+      throw new Error(`${errorMessage}${errorDetails ? ` - ${errorDetails}` : ''}`);
+    }
+
+    let result;
+    try {
+      result = JSON.parse(responseText);
+    } catch (e) {
+      console.error('Failed to parse Resend response as JSON:', responseText);
+      throw new Error('Invalid response from email service');
+    }
+
+    console.log('Verification email sent successfully!');
+    console.log('Email ID:', result.id);
+    console.log('Full Resend response:', result);
+    
+    return { success: true, id: result.id, senderEmail };
+  } catch (error) {
+    console.error('=== EMAIL SENDING ERROR ===');
+    if (error instanceof Error) {
+      console.error('Error type:', error.constructor.name);
+      console.error('Error message:', error.message);
+      console.error('Error stack:', error.stack);
+    } else {
+      console.error('Unknown error type:', typeof error);
+      console.error('Error:', error);
+    }
+    throw error;
+  }
+}
+
 // Updated authentication middleware for cookie-based auth
 const authMiddleware = async (c: any, next: any) => {
   const token = getCookie(c, 'auth_token');
@@ -596,55 +1269,107 @@ app.post('/api/auth/register', async (c) => {
     const passwordHash = await hashPassword(password);
 
     await c.env.DB.prepare(`
-      INSERT INTO users (id, email, name, password_hash, tier)
-      VALUES (?, ?, ?, ?, 'free')
+      INSERT INTO users (id, email, name, password_hash, tier, email_verified)
+      VALUES (?, ?, ?, ?, 'free', 0)
     `).bind(userId, email, name || null, passwordHash).run();
 
-    // Generate JWT and set as HttpOnly cookie
-    const token = await sign(
-      { userId, email, exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 7 }, // 7 days
-      c.env.JWT_SECRET
-    );
+    // Generate verification code and send email
+    const verificationCode = generateVerificationCode();
+    const frontendUrl = c.env.FRONTEND_URL || 'http://localhost:3000';
+    const resendApiKey = c.env.RESEND_API_KEY;
 
-    // Set HttpOnly cookie
-    setCookie(c, 'auth_token', token, {
-      httpOnly: true,
-      secure: true, // Required for SameSite=None
-      sameSite: 'None', // Required for cross-domain
-      path: '/',
-      maxAge: 60 * 60 * 24 * 7, // 7 days
-    });
+    if (!resendApiKey) {
+      return c.json({ error: 'Email service not configured' }, 500);
+    }
+
+    try {
+      const emailResult = await sendVerificationEmail(
+        email, 
+        verificationCode, 
+        frontendUrl, 
+        resendApiKey, 
+        c.env.FROM_EMAIL,
+        name
+      );
+
+      if (!emailResult.success) {
+        return c.json({ error: 'Failed to send verification email' }, 500);
+      }
+
+      // Store verification code in database
+      const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes from now
+
+      await c.env.DB.prepare(`
+        INSERT INTO email_verifications (user_id, code, expires_at, created_at)
+        VALUES (?, ?, ?, ?)
+      `).bind(userId, verificationCode, expiresAt.toISOString(), new Date().toISOString()).run();
+
+    } catch (emailError) {
+      console.error('Failed to send verification email:', emailError);
+      const errorMessage = emailError instanceof Error ? emailError.message : 'Unknown error';
+      return c.json({ 
+        error: 'Failed to send verification email',
+        details: errorMessage 
+      }, 500);
+    }
 
     return c.json({
-      user: { id: userId, email, name, tier: 'free' }
+      success: true,
+      message: 'Registration successful! Please check your email for a verification code.',
+      user: { 
+        id: userId, 
+        email, 
+        name, 
+        tier: 'free',
+        emailVerified: false
+      },
+      requiresVerification: true
     });
-
   } catch (error) {
     console.error('Registration error:', error);
-    return c.json({ error: 'Internal server error' }, 500);
+    const errorMessage = error instanceof Error ? error.message : 'Internal server error';
+    return c.json({ error: errorMessage }, 500);
   }
-});
+})
 
-app.post('/api/auth/login', async (c) => {
+// Email verification endpoint
+app.post('/api/auth/verify-email', async (c) => {
   try {
-    const { email, password } = await c.req.json();
+    const { email, code } = await c.req.json();
 
-    if (!email || !password) {
-      return c.json({ error: 'Email and password are required' }, 400);
+    if (!email || !code) {
+      return c.json({ error: 'Email and verification code are required' }, 400);
     }
 
-    // Find user
-    const user = await c.env.DB.prepare(
-      'SELECT * FROM users WHERE email = ?'
-    ).bind(email).first() as any;
+    // Find user and verification record
+    const verificationRecord = await c.env.DB.prepare(`
+      SELECT ev.user_id, ev.expires_at, u.email, u.name, u.tier
+      FROM email_verifications ev
+      JOIN users u ON ev.user_id = u.id
+      WHERE u.email = ? AND ev.code = ? AND ev.expires_at > ?
+    `).bind(email, code, new Date().toISOString()).first() as any;
 
-    if (!user || !(await verifyPassword(password, user.password_hash))) {
-      return c.json({ error: 'Invalid credentials' }, 401);
+    if (!verificationRecord) {
+      return c.json({ error: 'Invalid or expired verification code' }, 400);
     }
+
+    // Mark user as verified
+    await c.env.DB.prepare(`
+      UPDATE users SET email_verified = 1, updated_at = ? WHERE id = ?
+    `).bind(new Date().toISOString(), verificationRecord.user_id).run();
+
+    // Delete used verification code
+    await c.env.DB.prepare(`
+      DELETE FROM email_verifications WHERE user_id = ?
+    `).bind(verificationRecord.user_id).run();
 
     // Generate JWT and set as HttpOnly cookie
     const token = await sign(
-      { userId: user.id, email: user.email, exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 7 },
+      { 
+        userId: verificationRecord.user_id, 
+        email: verificationRecord.email, 
+        exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 7 
+      },
       c.env.JWT_SECRET
     );
 
@@ -656,21 +1381,178 @@ app.post('/api/auth/login', async (c) => {
       path: '/',
       maxAge: 60 * 60 * 24 * 7, // 7 days
     });
- 
+
+    return c.json({
+      success: true,
+      message: 'Email verified successfully! Welcome to LinkShort.',
+      user: {
+        id: verificationRecord.user_id,
+        email: verificationRecord.email,
+        name: verificationRecord.name,
+        tier: verificationRecord.tier,
+        emailVerified: true
+      }
+    });
+
+  } catch (error) {
+    console.error('Email verification error:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+// Resend verification code endpoint
+app.post('/api/auth/resend-verification', async (c) => {
+  try {
+    const { email } = await c.req.json();
+
+    if (!email) {
+      return c.json({ error: 'Email is required' }, 400);
+    }
+
+    // Find user
+    const user = await c.env.DB.prepare(
+      'SELECT id, email, name FROM users WHERE email = ? AND email_verified = 0'
+    ).bind(email).first() as any;
+
+    if (!user) {
+      return c.json({ error: 'User not found or already verified' }, 404);
+    }
+
+    // Delete any existing verification codes
+    await c.env.DB.prepare(`
+      DELETE FROM email_verifications WHERE user_id = ?
+    `).bind(user.id).run();
+
+    // Generate new verification code
+    const verificationCode = generateVerificationCode();
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes from now
+
+    // Store new verification code
+    await c.env.DB.prepare(`
+      INSERT INTO email_verifications (user_id, code, expires_at, created_at)
+      VALUES (?, ?, ?, ?)
+    `).bind(user.id, verificationCode, expiresAt.toISOString(), new Date().toISOString()).run();
+
+    // Send verification email
+    const origin = c.env.FRONTEND_URL || c.req.header('Origin') || 'http://localhost:3000';
+    
+    try {
+      await sendVerificationEmail(
+        user.email, 
+        verificationCode, 
+        origin, 
+        c.env.RESEND_API_KEY,
+        c.env.FROM_EMAIL,
+        user.name
+      );
+
+      return c.json({
+        success: true,
+        message: 'Verification code sent! Please check your email.'
+      });
+    } catch (emailError) {
+      console.error('Failed to send verification email:', emailError);
+      const errorMessage = emailError instanceof Error ? emailError.message : 'Unknown error';
+      return c.json({ 
+        error: 'Failed to send verification email',
+        details: errorMessage
+      }, 500);
+    }
+
+  } catch (error) {
+    console.error('Resend verification error:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Internal server error';
+    return c.json({ error: errorMessage }, 500);
+  }
+});
+
+app.post("/api/auth/login", async (c) => {
+  try{
+    const { email, password } = await c.req.json()
+
+    if (!email || !password) {
+      return c.json({ error: "Email and password are required" }, 400)
+    }
+
+    // Find user
+    const user = (await c.env.DB.prepare("SELECT * FROM users WHERE email = ?").bind(email).first()) as any
+
+    if (!user || !(await verifyPassword(password, user.password_hash))) {
+      return c.json({ error: "Invalid credentials" }, 401)
+    }
+
+    // Check if email is verified
+    if (!user.email_verified) {
+      const code = generateVerificationCode()
+      const expiresAt = new Date(Date.now() + 15 * 60 * 1000)
+
+      try {
+        // Send verification email
+        await sendVerificationEmail(
+          user.email, 
+          code, 
+          c.env.FRONTEND_URL || 'http://localhost:3000', 
+          c.env.RESEND_API_KEY,
+          c.env.FROM_EMAIL,
+          user.name
+        )
+
+        // Insert new verification code
+        await c.env.DB.prepare(`
+          INSERT INTO email_verifications (user_id, code, expires_at, created_at)
+          VALUES (?, ?, ?, ?)
+        `)
+          .bind(user.id, code, expiresAt.toISOString(), new Date().toISOString())
+          .run()
+
+        return c.json(
+          {
+            error: "Email not verified",
+            requiresVerification: true,
+            email: user.email,
+          },
+          403,
+        )
+          } catch (emailError) {
+      console.error('Failed to send verification email:', emailError);
+      const errorMessage = emailError instanceof Error ? emailError.message : 'Unknown error';
+      return c.json({ 
+        error: 'Failed to send verification email',
+        details: errorMessage
+      }, 500);
+    }
+    }
+
+    // Generate JWT and set as HttpOnly cookie
+    
+    const token = await sign(
+      { userId: user.id, email: user.email, exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 7 },
+      c.env.JWT_SECRET,
+    )
+
+    // Set HttpOnly cookie
+    setCookie(c, "auth_token", token, {
+      httpOnly: true,
+      secure: true,
+      sameSite: "None",
+      path: "/",
+      maxAge: 60 * 60 * 24 * 7, // 7 days
+    })
+
     return c.json({
       user: {
         id: user.id,
         email: user.email,
         name: user.name,
-        tier: user.tier
-      }
-    });
-
+        tier: user.tier,
+        emailVerified: user.email_verified,
+      },
+    })
   } catch (error) {
-    console.error('Login error:', error);
-    return c.json({ error: 'Internal server error' }, 500);
+    console.error("Login error:", error)
+    return c.json({ error: "Internal server error" }, 500)
   }
-});
+})
 
 // Enhanced forgot password endpoint with comprehensive debugging
 app.post('/api/auth/forgot-password', async (c) => {
@@ -774,10 +1656,12 @@ app.post('/api/auth/forgot-password', async (c) => {
       console.log('✅ Email sent successfully:', emailResult);
     } catch (emailError) {
       console.error('❌ Failed to send password reset email:', emailError);
+      const errorMessage = emailError instanceof Error ? emailError.message : 'Unknown error';
+      const errorStack = emailError instanceof Error ? emailError.stack : undefined;
       // Return the actual error for debugging (in production, you might want to return a generic message)
       return c.json({ 
-        error: `Failed to send email: ${emailError.message}`,
-        details: emailError.stack 
+        error: `Failed to send email: ${errorMessage}`,
+        details: errorStack 
       }, 500);
     }
 
@@ -796,12 +1680,19 @@ app.post('/api/auth/forgot-password', async (c) => {
 
   } catch (error) {
     console.error('❌ Forgot password error:', error);
-    console.error('Error stack:', error.stack);
-    return c.json({ 
-      error: 'Internal server error',
-      details: error.message,
-      stack: error.stack 
-    }, 500);
+    if (error instanceof Error) {
+      console.error('Error stack:', error.stack);
+      return c.json({ 
+        error: 'Internal server error',
+        details: error.message,
+        stack: error.stack 
+      }, 500);
+    } else {
+      return c.json({ 
+        error: 'Internal server error',
+        details: 'Unknown error occurred'
+      }, 500);
+    }
   }
 });
 
@@ -850,7 +1741,8 @@ app.post('/api/auth/reset-password', async (c) => {
 
   } catch (error) {
     console.error('Reset password error:', error);
-    return c.json({ error: 'Internal server error' }, 500);
+    const errorMessage = error instanceof Error ? error.message : 'Internal server error';
+    return c.json({ error: errorMessage }, 500);
   }
 });
 
@@ -883,7 +1775,8 @@ app.get('/api/auth/me', authMiddleware, async (c) => {
 
   } catch (error) {
     console.error('Get user error:', error);
-    return c.json({ error: 'Internal server error' }, 500);
+    const errorMessage = error instanceof Error ? error.message : 'Internal server error';
+    return c.json({ error: errorMessage }, 500);
   }
 });
 
@@ -1396,4 +2289,4 @@ app.get('/api/domains', authMiddleware, async (c) => {
   }
 });
 
-export default app;
+export default app;  
