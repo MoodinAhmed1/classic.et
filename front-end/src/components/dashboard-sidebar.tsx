@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { BarChart3, LinkIcon, Settings, Globe, Zap, LogOut, Clock } from 'lucide-react';
+import { BarChart3, LinkIcon, Settings, Globe, Zap, LogOut, Clock, Crown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/auth-context';
@@ -18,6 +18,7 @@ const navigation = [
     icon: Globe,
     premium: true 
   },
+  { name: 'Subscription', href: '/dashboard/subscription', icon: Crown },
   { name: 'Settings', href: '/dashboard/settings', icon: Settings },
 ];
 

@@ -139,7 +139,7 @@ export const authApi = {
     });
   },
 };
-
+ 
 // Links API - Updated to use cookie authentication
 export const linksApi = {
   create: async (data: {
@@ -259,6 +259,98 @@ export const domainsApi = {
     return apiRequest<{ success: boolean }>(`/api/domains/${id}`, {
       method: 'DELETE',
     });
+  },
+};
+
+// Subscription API
+export const subscriptionApi = {
+  getPlans: async () => {
+    return apiRequest<{
+      plans: Array<{
+        id: string;
+        name: string;
+        tier: 'free' | 'pro' | 'premium';
+        priceMonthly: number;
+        priceYearly: number;
+        features: string[];
+        limits: {
+          links_per_month: number;
+          api_requests_per_month: number;
+          custom_domains: number;
+          analytics_retention_days: number;
+          team_members: number;
+        };
+      }>;
+    }>('/api/subscription/plans');
+  },
+
+  getCurrent: async () => {
+    return apiRequest<{
+      user: {
+        id: string;
+        email: string;
+        name: string;
+        tier: 'free' | 'pro' | 'premium';
+        subscriptionStatus: 'active' | 'canceled' | 'past_due' | 'unpaid';
+        subscriptionId?: string;
+        currentPeriodStart?: string;
+        currentPeriodEnd?: string;
+        cancelAtPeriodEnd: boolean;
+        createdAt: string;
+        updatedAt: string;
+      };
+      plan: {
+        id: string;
+        name: string;
+        tier: 'free' | 'pro' | 'premium';
+        priceMonthly: number;
+        priceYearly: number;
+        features: string[];
+        limits: {
+          links_per_month: number;
+          api_requests_per_month: number;
+          custom_domains: number;
+          analytics_retention_days: number;
+          team_members: number;
+        };
+      };
+    }>('/api/subscription/current');
+  },
+
+  getUsage: async () => {
+    return apiRequest<{
+      current: {
+        id: string;
+        user_id: string;
+        month: string;
+        links_created: number;
+        api_requests: number;
+        custom_domains_used: number;
+        analytics_events: number;
+        created_at: string;
+        updated_at: string;
+      };
+      plan: {
+        id: string;
+        name: string;
+        tier: 'free' | 'pro' | 'premium';
+        priceMonthly: number;
+        priceYearly: number;
+        features: string[];
+        limits: {
+          links_per_month: number;
+          api_requests_per_month: number;
+          custom_domains: number;
+          analytics_retention_days: number;
+          team_members: number;
+        };
+      };
+      limits: {
+        links: { current: number; limit: number; percentage: number };
+        api: { current: number; limit: number; percentage: number };
+        domains: { current: number; limit: number; percentage: number };
+      };
+    }>('/api/subscription/usage');
   },
 };
 

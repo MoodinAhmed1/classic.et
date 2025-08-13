@@ -3,6 +3,7 @@
 import { StatsOverview } from '@/components/stats-overview';
 import { RecentLinks } from '@/components/recent-links';
 import { LinkShortener } from '@/components/link-shortner';
+import { UsageWarning } from '@/components/usage-warning';
 
 export default function DashboardPage() {
   return (
@@ -14,6 +15,9 @@ export default function DashboardPage() {
           Manage your shortened links and view analytics
         </p>
       </div>
+
+      {/* Usage Warning */}
+      <UsageWarning />
 
       {/* Link Shortener */}
       <LinkShortener />

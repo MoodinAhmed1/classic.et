@@ -4,8 +4,17 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { jwt, sign, verify } from 'hono/jwt';
-import { setCookie, getCookie, deleteCookie } from 'hono/cookie';
+import { setCookie, getCookie } from 'hono/cookie';
 import { UAParser } from 'ua-parser-js';
+import { 
+  checkUsageLimit, 
+  incrementUsage, 
+  getUserUsageSummary, 
+  getSubscriptionPlan,
+  hasFeatureAccess,
+  getAnalyticsRetentionDays
+} from './subscription-utils';
+import { StripeService, WebhookHandler, STRIPE_PRICE_IDS } from './stripe-integration';
 
 interface Env {
   DB: D1Database;
@@ -13,6 +22,8 @@ interface Env {
   RESEND_API_KEY: string;
   FRONTEND_URL: string;
   FROM_EMAIL: string; // Optional, can be set to a verified domain email
+  STRIPE_SECRET_KEY: string;
+  STRIPE_WEBHOOK_SECRET: string;
 }
 
 interface User {
@@ -20,6 +31,11 @@ interface User {
   email: string;
   name: string;
   tier: 'free' | 'pro' | 'premium';
+  subscription_status: 'active' | 'canceled' | 'past_due' | 'unpaid';
+  subscription_id?: string;
+  current_period_start?: string;
+  current_period_end?: string;
+  cancel_at_period_end: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -1906,6 +1922,18 @@ app.post('/api/links', authMiddleware, async (c) => {
       return c.json({ error: 'Invalid URL format' }, 400);
     }
 
+    // Check usage limits before creating link
+    const usageCheck = await checkUsageLimit(c.env.DB, payload.userId, 'create_link');
+    if (!usageCheck.allowed) {
+      return c.json({ 
+        error: 'Link creation limit reached', 
+        details: `You've created ${usageCheck.current} links this month. Your ${usageCheck.limit} limit has been reached.`,
+        upgradeRequired: true,
+        current: usageCheck.current,
+        limit: usageCheck.limit
+      }, 403);
+    }
+
     // Get user to check tier
     const user = await c.env.DB.prepare(
       'SELECT tier FROM users WHERE id = ?'
@@ -1963,6 +1991,9 @@ app.post('/api/links', authMiddleware, async (c) => {
       now,
       now
     ).run();
+
+    // Increment usage tracking
+    await incrementUsage(c.env.DB, payload.userId, 'create_link');
 
     return c.json({
       id: linkId,
@@ -2286,6 +2317,222 @@ app.get('/api/domains', authMiddleware, async (c) => {
   } catch (error) {
     console.error('Get domains error:', error);
     return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+// Subscription and billing routes
+app.get('/api/subscription/plans', async (c) => {
+  try {
+    const plans = await c.env.DB.prepare(`
+      SELECT * FROM subscription_plans ORDER BY price_monthly ASC
+    `).all();
+
+    return c.json({
+      plans: plans.results.map((plan: any) => ({
+        id: plan.id,
+        name: plan.name,
+        tier: plan.tier,
+        priceMonthly: plan.price_monthly,
+        priceYearly: plan.price_yearly,
+        features: JSON.parse(plan.features),
+        limits: JSON.parse(plan.limits)
+      }))
+    });
+  } catch (error) {
+    console.error('Get plans error:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+app.get('/api/subscription/usage', authMiddleware, async (c) => {
+  try {
+    const payload = c.get('jwtPayload');
+    const usageSummary = await getUserUsageSummary(c.env.DB, payload.userId);
+    
+    return c.json(usageSummary);
+  } catch (error) {
+    console.error('Get usage error:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+app.get('/api/subscription/current', authMiddleware, async (c) => {
+  try {
+    const payload = c.get('jwtPayload');
+    
+    const user = await c.env.DB.prepare(`
+      SELECT id, email, name, tier, subscription_status, subscription_id, 
+             current_period_start, current_period_end, cancel_at_period_end,
+             created_at, updated_at
+      FROM users WHERE id = ?
+    `).bind(payload.userId).first() as any;
+
+    const plan = await getSubscriptionPlan(c.env.DB, user.tier);
+    
+    return c.json({
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        tier: user.tier,
+        subscriptionStatus: user.subscription_status,
+        subscriptionId: user.subscription_id,
+        currentPeriodStart: user.current_period_start,
+        currentPeriodEnd: user.current_period_end,
+        cancelAtPeriodEnd: user.cancel_at_period_end,
+        createdAt: user.created_at,
+        updatedAt: user.updated_at
+      },
+      plan
+    });
+  } catch (error) {
+    console.error('Get current subscription error:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+// Stripe checkout endpoints
+app.post('/api/subscription/checkout', authMiddleware, async (c) => {
+  try {
+    const payload = c.get('jwtPayload');
+    const { planId, billingCycle } = await c.req.json();
+
+    if (!planId || !billingCycle) {
+      return c.json({ error: 'Plan ID and billing cycle are required' }, 400);
+    }
+
+    // Get user details
+    const user = await c.env.DB.prepare(`
+      SELECT email, name FROM users WHERE id = ?
+    `).bind(payload.userId).first() as any;
+
+    if (!user) {
+      return c.json({ error: 'User not found' }, 404);
+    }
+
+    // Get plan details
+    const plan = await getSubscriptionPlan(c.env.DB, planId);
+    if (!plan) {
+      return c.json({ error: 'Invalid plan' }, 400);
+    }
+
+    // Get price ID based on plan and billing cycle
+    const priceId = billingCycle === 'yearly' 
+      ? STRIPE_PRICE_IDS[plan.tier as keyof typeof STRIPE_PRICE_IDS]?.yearly
+      : STRIPE_PRICE_IDS[plan.tier as keyof typeof STRIPE_PRICE_IDS]?.monthly;
+
+    if (!priceId) {
+      return c.json({ error: 'Price not configured for this plan' }, 400);
+    }
+
+    // Initialize Stripe service
+    const stripeService = new StripeService({
+      secretKey: c.env.STRIPE_SECRET_KEY,
+      webhookSecret: c.env.STRIPE_WEBHOOK_SECRET,
+    });
+
+    // Create checkout session
+    const session = await stripeService.createCheckoutSession({
+      planId,
+      planTier: plan.tier as 'pro' | 'premium',
+      priceId,
+      customerEmail: user.email,
+      successUrl: `${c.env.FRONTEND_URL}/dashboard/subscription?success=true`,
+      cancelUrl: `${c.env.FRONTEND_URL}/dashboard/subscription?canceled=true`,
+    });
+
+    return c.json({
+      sessionId: session.id,
+      url: session.url,
+    });
+  } catch (error) {
+    console.error('Checkout error:', error);
+    return c.json({ error: 'Failed to create checkout session' }, 500);
+  }
+});
+
+app.post('/api/subscription/billing-portal', authMiddleware, async (c) => {
+  try {
+    const payload = c.get('jwtPayload');
+    
+    // Get user's subscription ID
+    const user = await c.env.DB.prepare(`
+      SELECT subscription_id FROM users WHERE id = ?
+    `).bind(payload.userId).first() as any;
+
+    if (!user?.subscription_id) {
+      return c.json({ error: 'No active subscription found' }, 404);
+    }
+
+    // Get subscription details from Stripe
+    const stripeService = new StripeService({
+      secretKey: c.env.STRIPE_SECRET_KEY,
+      webhookSecret: c.env.STRIPE_WEBHOOK_SECRET,
+    });
+
+    const subscription = await stripeService.getSubscription(user.subscription_id);
+    
+    // Create billing portal session
+    const session = await stripeService.createBillingPortalSession(
+      subscription.customer as string,
+      `${c.env.FRONTEND_URL}/dashboard/subscription`
+    );
+
+    return c.json({
+      url: session.url,
+    });
+  } catch (error) {
+    console.error('Billing portal error:', error);
+    return c.json({ error: 'Failed to create billing portal session' }, 500);
+  }
+});
+
+// Webhook endpoint for Stripe
+app.post('/api/webhooks/stripe', async (c) => {
+  try {
+    const body = await c.req.text();
+    const signature = c.req.header('stripe-signature');
+    
+    if (!signature) {
+      return c.json({ error: 'No signature provided' }, 400);
+    }
+
+    // Initialize Stripe service and webhook handler
+    const stripeService = new StripeService({
+      secretKey: c.env.STRIPE_SECRET_KEY,
+      webhookSecret: c.env.STRIPE_WEBHOOK_SECRET,
+    });
+
+    const webhookHandler = new WebhookHandler(c.env.DB);
+
+    // Verify webhook signature
+    const event = stripeService.verifyWebhookSignature(body, signature, c.env.STRIPE_WEBHOOK_SECRET);
+
+    // Handle different event types
+    switch (event.type) {
+      case 'customer.subscription.created':
+        await webhookHandler.handleSubscriptionCreated(event);
+        break;
+      case 'customer.subscription.updated':
+        await webhookHandler.handleSubscriptionUpdated(event);
+        break;
+      case 'customer.subscription.deleted':
+        await webhookHandler.handleSubscriptionDeleted(event);
+        break;
+      case 'invoice.payment_succeeded':
+        await webhookHandler.handleInvoicePaymentSucceeded(event);
+        break;
+      case 'invoice.payment_failed':
+        await webhookHandler.handleInvoicePaymentFailed(event);
+        break;
+      default:
+        console.log(`Unhandled event type: ${event.type}`);
+    }
+    
+    return c.json({ received: true });
+  } catch (error) {
+    console.error('Stripe webhook error:', error);
+    return c.json({ error: 'Webhook error' }, 400);
   }
 });
 
