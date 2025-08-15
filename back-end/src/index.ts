@@ -12,7 +12,13 @@ import {
   getUserUsageSummary, 
   getSubscriptionPlan,
   hasFeatureAccess,
-  getAnalyticsRetentionDays
+  getAnalyticsRetentionDays,
+  checkVisitorCap,
+  trackNewVisitor,
+  canSeeFullAnalytics,
+  canSeeAdvancedCharts,
+  canDownloadPDF,
+  updateLastVisit
 } from './subscription-utils';
 import { StripeService, WebhookHandler, STRIPE_PRICE_IDS } from './stripe-integration';
 
@@ -1934,6 +1940,19 @@ app.post('/api/links', authMiddleware, async (c) => {
       }, 403);
     }
 
+    // Check if user already has a link with the same original URL
+    const existingLink = await c.env.DB.prepare(
+      'SELECT id, short_code FROM links WHERE user_id = ? AND original_url = ?'
+    ).bind(payload.userId, originalUrl).first();
+    
+    if (existingLink) {
+      return c.json({ 
+        error: 'Duplicate link detected', 
+        details: 'You already have a link that redirects to this URL.',
+        existingShortCode: existingLink.short_code
+      }, 409);
+    }
+
     // Get user to check tier
     const user = await c.env.DB.prepare(
       'SELECT tier FROM users WHERE id = ?'
@@ -2143,6 +2162,12 @@ app.get('/api/links/:id/analytics', authMiddleware, async (c) => {
       return c.json({ error: 'Link not found' }, 404);
     }
 
+    // Get user's subscription plan for retention days
+    const user = await c.env.DB.prepare(`
+      SELECT tier FROM users WHERE id = ?
+    `).bind(payload.userId).first() as any;
+    const plan = await getSubscriptionPlan(c.env.DB, user.tier);
+
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
 
@@ -2157,6 +2182,7 @@ app.get('/api/links/:id/analytics', authMiddleware, async (c) => {
         referer
       FROM analytics_events 
       WHERE link_id = ? AND timestamp >= ?
+      AND timestamp >= datetime('now', '-${plan?.limits.analytics_retention_days || 7} days')
       GROUP BY DATE(timestamp), country, device_type, browser, referer
       ORDER BY timestamp DESC
     `).bind(linkId, startDate.toISOString()).all();
@@ -2176,13 +2202,43 @@ app.get('/api/links/:id/analytics', authMiddleware, async (c) => {
       if (row.referer) clicksByReferrer[row.referer] = (clicksByReferrer[row.referer] || 0) + row.clicks;
     });
 
+    // Check user's analytics permissions
+    const canSeeFull = await canSeeFullAnalytics(c.env.DB, payload.userId);
+    const canSeeAdvanced = await canSeeAdvancedCharts(c.env.DB, payload.userId);
+
+    // Apply restrictions based on user tier
+    let restrictedCountries = clicksByCountry;
+    let restrictedDevices = clicksByDevice;
+    let restrictedBrowsers = clicksByBrowser;
+
+    if (!canSeeFull) {
+      // For free users, blur out top 3 countries and hide top browsers/devices
+      const countryEntries = Object.entries(clicksByCountry).sort(([,a], [,b]) => b - a);
+      if (countryEntries.length > 3) {
+        restrictedCountries = Object.fromEntries(countryEntries.slice(3));
+      } else {
+        restrictedCountries = {};
+      }
+      
+      // Completely hide browsers and devices for free users
+      restrictedBrowsers = {};
+      restrictedDevices = {};
+    }
+
     return c.json({
       clicksByDate,
-      clicksByCountry,
-      clicksByDevice,
-      clicksByBrowser,
+      clicksByCountry: restrictedCountries,
+      clicksByDevice: restrictedDevices,
+      clicksByBrowser: restrictedBrowsers,
       clicksByReferrer,
-      totalClicks: Object.values(clicksByDate).reduce((sum, clicks) => sum + clicks, 0)
+      totalClicks: Object.values(clicksByDate).reduce((sum, clicks) => sum + clicks, 0),
+      restrictions: {
+        canSeeFullAnalytics: canSeeFull,
+        canSeeAdvancedCharts: canSeeAdvanced,
+        topCountriesHidden: !canSeeFull && Object.keys(clicksByCountry).length > 3 ? 3 : 0,
+        browsersHidden: !canSeeFull,
+        devicesHidden: !canSeeFull
+      }
     });
 
   } catch (error) {
@@ -2208,6 +2264,17 @@ app.get('/:shortCode', async (c) => {
     // Check if link is expired
     if (link.expires_at && new Date(link.expires_at) < new Date()) {
       return c.redirect('https://your-frontend-domain.com/expired');
+    }
+
+    // Check visitor cap for the link owner
+    const visitorCapCheck = await checkVisitorCap(c.env.DB, link.user_id);
+    
+    if (!visitorCapCheck.allowed) {
+      // Stop tracking analytics when visitor cap is reached
+      console.log(`Visitor cap reached for user ${link.user_id}: ${visitorCapCheck.current}/${visitorCapCheck.limit}`);
+      
+      // Still redirect but don't track analytics
+      return c.redirect(link.original_url);
     }
 
     // Track analytics
@@ -2241,6 +2308,9 @@ app.get('/:shortCode', async (c) => {
       'UPDATE links SET click_count = click_count + 1 WHERE id = ?'
     ).bind(link.id).run();
 
+    // Track new visitor for the link owner
+    await trackNewVisitor(c.env.DB, link.user_id);
+
     // Redirect to original URL
     return c.redirect(link.original_url);
 
@@ -2250,75 +2320,124 @@ app.get('/:shortCode', async (c) => {
   }
 });
 
-// Custom domains routes (Premium feature)
-app.post('/api/domains', authMiddleware, async (c) => {
+// Global analytics endpoint
+app.get('/api/analytics/global', authMiddleware, async (c) => {
   try {
     const payload = c.get('jwtPayload');
-    const { domain } = await c.req.json();
+    const days = parseInt(c.req.query('days') || '30');
 
-    // Check user tier
-    const user = await c.env.DB.prepare(
-      'SELECT tier FROM users WHERE id = ?'
-    ).bind(payload.userId).first() as { tier: string };
+    // Update last visit time for user
+    await updateLastVisit(c.env.DB, payload.userId);
 
-    if (user.tier !== 'premium') {
-      return c.json({ error: 'Custom domains require Premium plan' }, 403);
+    // Get user's analytics permissions
+    const canSeeFull = await canSeeFullAnalytics(c.env.DB, payload.userId);
+    const canSeeAdvanced = await canSeeAdvancedCharts(c.env.DB, payload.userId);
+
+    // Get user's subscription plan for retention days
+    const user = await c.env.DB.prepare(`
+      SELECT tier FROM users WHERE id = ?
+    `).bind(payload.userId).first() as any;
+    const plan = await getSubscriptionPlan(c.env.DB, user.tier);
+
+    // Get all user links
+    const links = await c.env.DB.prepare(`
+      SELECT id, short_code, title, click_count, created_at
+      FROM links 
+      WHERE user_id = ? 
+      ORDER BY created_at DESC
+    `).bind(payload.userId).all();
+
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+
+    // Get global analytics data
+    const analytics = await c.env.DB.prepare(`
+      SELECT 
+        DATE(timestamp) as date,
+        COUNT(*) as clicks,
+        country,
+        device_type,
+        browser,
+        link_id
+      FROM analytics_events 
+      WHERE link_id IN (${links.results.map(() => '?').join(',')}) 
+      AND timestamp >= ?
+      AND timestamp >= datetime('now', '-${plan?.limits.analytics_retention_days || 7} days')
+      GROUP BY DATE(timestamp), country, device_type, browser, link_id
+      ORDER BY timestamp DESC
+    `).bind(...links.results.map((l: any) => l.id), startDate.toISOString()).all();
+
+    // Process analytics data
+    const clicksByDate: { [key: string]: number } = {};
+    const clicksByCountry: { [key: string]: number } = {};
+    const clicksByDevice: { [key: string]: number } = {};
+    const clicksByBrowser: { [key: string]: number } = {};
+    const clicksByLink: { [key: string]: number } = {};
+
+    analytics.results.forEach((row: any) => {
+      clicksByDate[row.date] = (clicksByDate[row.date] || 0) + row.clicks;
+      if (row.country) clicksByCountry[row.country] = (clicksByCountry[row.country] || 0) + row.clicks;
+      if (row.device_type) clicksByDevice[row.device_type] = (clicksByDevice[row.device_type] || 0) + row.clicks;
+      if (row.browser) clicksByBrowser[row.browser] = (clicksByBrowser[row.browser] || 0) + row.clicks;
+      if (row.link_id) clicksByLink[row.link_id] = (clicksByLink[row.link_id] || 0) + row.clicks;
+    });
+
+    // Apply restrictions based on user tier
+    let restrictedCountries = clicksByCountry;
+    let restrictedDevices = clicksByDevice;
+    let restrictedBrowsers = clicksByBrowser;
+
+    if (!canSeeFull) {
+      // For free users, blur out top 3 countries and hide top browsers/devices
+      const countryEntries = Object.entries(clicksByCountry).sort(([,a], [,b]) => b - a);
+      if (countryEntries.length > 3) {
+        restrictedCountries = Object.fromEntries(countryEntries.slice(3));
+      } else {
+        restrictedCountries = {};
+      }
+      
+      // Completely hide browsers and devices for free users
+      restrictedBrowsers = {};
+      restrictedDevices = {};
     }
 
-    // Check if domain already exists
-    const existing = await c.env.DB.prepare(
-      'SELECT id FROM custom_domains WHERE domain = ?'
-    ).bind(domain).first();
-
-    if (existing) {
-      return c.json({ error: 'Domain already exists' }, 409);
-    }
-
-    // Create domain
-    const domainId = generateId();
-    const verificationToken = generateId();
-
-    await c.env.DB.prepare(`
-      INSERT INTO custom_domains (id, user_id, domain, verification_token)
-      VALUES (?, ?, ?, ?)
-    `).bind(domainId, payload.userId, domain, verificationToken).run();
+    // Get usage summary for visitor caps
+    const usageSummary = await getUserUsageSummary(c.env.DB, payload.userId);
 
     return c.json({
-      id: domainId,
-      domain,
-      isVerified: false,
-      verificationToken
+      links: links.results.map((link: any) => ({
+        id: link.id,
+        shortCode: link.short_code,
+        title: link.title || 'Untitled',
+        clickCount: link.click_count,
+        createdAt: link.created_at,
+        clicksInPeriod: clicksByLink[link.id] || 0
+      })),
+      clicksByDate,
+      clicksByCountry: restrictedCountries,
+      clicksByDevice: restrictedDevices,
+      clicksByBrowser: restrictedBrowsers,
+      totalClicks: Object.values(clicksByDate).reduce((sum, clicks) => sum + clicks, 0),
+      restrictions: {
+        canSeeFullAnalytics: canSeeFull,
+        canSeeAdvancedCharts: canSeeAdvanced,
+        topCountriesHidden: !canSeeFull && Object.keys(clicksByCountry).length > 3 ? 3 : 0,
+        browsersHidden: !canSeeFull,
+        devicesHidden: !canSeeFull
+      },
+      usage: {
+        visitorCap: usageSummary.limits.visitors,
+        newVisitorsSinceLastVisit: usageSummary.newVisitorsSinceLastVisit
+      }
     });
 
   } catch (error) {
-    console.error('Create domain error:', error);
+    console.error('Get global analytics error:', error);
     return c.json({ error: 'Internal server error' }, 500);
   }
 });
 
-app.get('/api/domains', authMiddleware, async (c) => {
-  try {
-    const payload = c.get('jwtPayload');
 
-    const domains = await c.env.DB.prepare(
-      'SELECT * FROM custom_domains WHERE user_id = ? ORDER BY created_at DESC'
-    ).bind(payload.userId).all();
-
-    return c.json({
-      domains: domains.results.map((domain: any) => ({
-        id: domain.id,
-        domain: domain.domain,
-        isVerified: domain.is_verified,
-        verificationToken: domain.verification_token,
-        createdAt: domain.created_at
-      }))
-    });
-
-  } catch (error) {
-    console.error('Get domains error:', error);
-    return c.json({ error: 'Internal server error' }, 500);
-  }
-});
 
 // Subscription and billing routes
 app.get('/api/subscription/plans', async (c) => {

@@ -36,8 +36,6 @@ interface SubscriptionPlan {
   features: string[];
   limits: {
     links_per_month: number;
-    api_requests_per_month: number;
-    custom_domains: number;
     analytics_retention_days: number;
     team_members: number;
   };
@@ -49,17 +47,26 @@ interface UsageSummary {
     user_id: string;
     month: string;
     links_created: number;
-    api_requests: number;
-    custom_domains_used: number;
     analytics_events: number;
     created_at: string;
     updated_at: string;
   };
-  plan: SubscriptionPlan;
+  plan: {
+    id: string;
+    name: string;
+    tier: 'free' | 'pro' | 'premium';
+    priceMonthly: number;
+    priceYearly: number;
+    features: string[];
+    limits: {
+      links_per_month: number;
+      analytics_retention_days: number;
+      team_members: number;
+    };
+  };
   limits: {
     links: { current: number; limit: number; percentage: number };
-    api: { current: number; limit: number; percentage: number };
-    domains: { current: number; limit: number; percentage: number };
+    visitors: { current: number; limit: number | null; percentage: number };
   };
 }
 
@@ -77,7 +84,19 @@ interface CurrentSubscription {
     createdAt: string;
     updatedAt: string;
   };
-  plan: SubscriptionPlan;
+  plan: {
+    id: string;
+    name: string;
+    tier: 'free' | 'pro' | 'premium';
+    priceMonthly: number;
+    priceYearly: number;
+    features: string[];
+    limits: {
+      links_per_month: number;
+      analytics_retention_days: number;
+      team_members: number;
+    };
+  };
 }
 
 export default function SubscriptionPage() {
@@ -212,8 +231,8 @@ export default function SubscriptionPage() {
     return `$${(price / 100).toFixed(2)}`;
   };
 
-  const formatLimit = (limit: number) => {
-    if (limit === -1) return 'Unlimited';
+  const formatLimit = (limit: number | null) => {
+    if (limit === null || limit === -1) return 'Unlimited';
     return limit.toLocaleString();
   };
 
@@ -352,32 +371,32 @@ export default function SubscriptionPage() {
 
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">API Requests</CardTitle>
+                  <CardTitle className="text-sm font-medium">Analytics Retention</CardTitle>
                   <Code className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">
-                    {usageSummary.limits.api.current} / {formatLimit(usageSummary.limits.api.limit)}
+                    {currentSubscription?.plan.limits.analytics_retention_days || 7} days
                   </div>
-                  <Progress value={usageSummary.limits.api.percentage} className="mt-2" />
+                  <Progress value={100} className="mt-2" />
                   <p className="text-xs text-muted-foreground mt-1">
-                    {usageSummary.limits.api.percentage}% of monthly limit
+                    Data retention period
                   </p>
                 </CardContent>
               </Card>
 
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Custom Domains</CardTitle>
-                  <Globe className="h-4 w-4 text-muted-foreground" />
+                  <CardTitle className="text-sm font-medium">Visitor Cap</CardTitle>
+                  <Users className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">
-                    {usageSummary.limits.domains.current} / {formatLimit(usageSummary.limits.domains.limit)}
+                    {usageSummary.limits.visitors.current.toLocaleString()} / {formatLimit(usageSummary.limits.visitors.limit)}
                   </div>
-                  <Progress value={usageSummary.limits.domains.percentage} className="mt-2" />
+                  <Progress value={usageSummary.limits.visitors.limit === null ? 100 : usageSummary.limits.visitors.percentage} className="mt-2" />
                   <p className="text-xs text-muted-foreground mt-1">
-                    {usageSummary.limits.domains.percentage}% of limit
+                    {usageSummary.limits.visitors.limit === null ? 'Unlimited' : `${usageSummary.limits.visitors.percentage}% of monthly limit`}
                   </p>
                 </CardContent>
               </Card>
@@ -431,16 +450,12 @@ export default function SubscriptionPage() {
                       <span className="font-medium">{formatLimit(plan.limits.links_per_month)}</span>
                     </div>
                     <div className="flex items-center justify-between text-sm">
-                      <span>API requests:</span>
-                      <span className="font-medium">{formatLimit(plan.limits.api_requests_per_month)}</span>
-                    </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <span>Custom domains:</span>
-                      <span className="font-medium">{formatLimit(plan.limits.custom_domains)}</span>
-                    </div>
-                    <div className="flex items-center justify-between text-sm">
                       <span>Analytics retention:</span>
                       <span className="font-medium">{plan.limits.analytics_retention_days} days</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span>Team members:</span>
+                      <span className="font-medium">{formatLimit(plan.limits.team_members)}</span>
                     </div>
                   </div>
                   
@@ -493,32 +508,6 @@ export default function SubscriptionPage() {
 
                   <div>
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-medium">API Requests</span>
-                      <span className="text-sm text-gray-500">
-                        {usageSummary.limits.api.current} / {formatLimit(usageSummary.limits.api.limit)}
-                      </span>
-                    </div>
-                    <Progress value={usageSummary.limits.api.percentage} className="h-2" />
-                    {usageSummary.limits.api.percentage >= 80 && (
-                      <p className="text-xs text-orange-600 mt-1 flex items-center gap-1">
-                        <AlertCircle className="h-3 w-3" />
-                        Approaching limit
-                      </p>
-                    )}
-                  </div>
-
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-medium">Custom Domains</span>
-                      <span className="text-sm text-gray-500">
-                        {usageSummary.limits.domains.current} / {formatLimit(usageSummary.limits.domains.limit)}
-                      </span>
-                    </div>
-                    <Progress value={usageSummary.limits.domains.percentage} className="h-2" />
-                  </div>
-
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
                       <span className="text-sm font-medium">Analytics Events</span>
                       <span className="text-sm text-gray-500">
                         {usageSummary.current.analytics_events.toLocaleString()}
@@ -528,6 +517,16 @@ export default function SubscriptionPage() {
                       <div className="h-2 bg-green-500 rounded-full" style={{ width: '100%' }}></div>
                     </div>
                     <p className="text-xs text-gray-500 mt-1">Unlimited</p>
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium">Visitor Cap</span>
+                      <span className="text-sm text-gray-500">
+                        Unlimited
+                      </span>
+                    </div>
+                    <Progress value={100} className="h-2" />
                   </div>
                 </div>
 

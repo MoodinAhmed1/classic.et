@@ -223,42 +223,35 @@ export const linksApi = {
   },
 };
 
-// Domains API - Updated to use cookie authentication
-export const domainsApi = {
-  create: async (data: { domain: string }) => {
+// Global Analytics API
+export const globalAnalyticsApi = {
+  getGlobalAnalytics: async (days = 30) => {
     return apiRequest<{
-      id: string;
-      domain: string;
-      isVerified: boolean;
-      verificationToken: string;
-    }>('/api/domains', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-  },
-
-  getAll: async () => {
-    return apiRequest<{
-      domains: Array<{
+      links: Array<{
         id: string;
-        domain: string;
-        isVerified: boolean;
-        verificationToken: string;
+        shortCode: string;
+        title: string | null;
+        clickCount: number;
         createdAt: string;
+        clicksInPeriod: number;
       }>;
-    }>('/api/domains');
-  },
-
-  verify: async (id: string) => {
-    return apiRequest<{ success: boolean; message: string }>(`/api/domains/${id}/verify`, {
-      method: 'POST',
-    });
-  },
-
-  delete: async (id: string) => {
-    return apiRequest<{ success: boolean }>(`/api/domains/${id}`, {
-      method: 'DELETE',
-    });
+      clicksByDate: { [key: string]: number };
+      clicksByCountry: { [key: string]: number };
+      clicksByDevice: { [key: string]: number };
+      clicksByBrowser: { [key: string]: number };
+      totalClicks: number;
+      restrictions: {
+        canSeeFullAnalytics: boolean;
+        canSeeAdvancedCharts: boolean;
+        topCountriesHidden: number;
+        browsersHidden: boolean;
+        devicesHidden: boolean;
+      };
+      usage: {
+        visitorCap: { current: number; limit: number | null; percentage: number };
+        newVisitorsSinceLastVisit: number;
+      };
+    }>(`/api/analytics/global?days=${days}`);
   },
 };
 
@@ -275,8 +268,6 @@ export const subscriptionApi = {
         features: string[];
         limits: {
           links_per_month: number;
-          api_requests_per_month: number;
-          custom_domains: number;
           analytics_retention_days: number;
           team_members: number;
         };
@@ -308,8 +299,6 @@ export const subscriptionApi = {
         features: string[];
         limits: {
           links_per_month: number;
-          api_requests_per_month: number;
-          custom_domains: number;
           analytics_retention_days: number;
           team_members: number;
         };
@@ -324,8 +313,6 @@ export const subscriptionApi = {
         user_id: string;
         month: string;
         links_created: number;
-        api_requests: number;
-        custom_domains_used: number;
         analytics_events: number;
         created_at: string;
         updated_at: string;
@@ -339,16 +326,13 @@ export const subscriptionApi = {
         features: string[];
         limits: {
           links_per_month: number;
-          api_requests_per_month: number;
-          custom_domains: number;
           analytics_retention_days: number;
           team_members: number;
         };
       };
       limits: {
         links: { current: number; limit: number; percentage: number };
-        api: { current: number; limit: number; percentage: number };
-        domains: { current: number; limit: number; percentage: number };
+        visitors: { current: number; limit: number | null; percentage: number };
       };
     }>('/api/subscription/usage');
   },

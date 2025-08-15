@@ -39,13 +39,6 @@ export function UsageWarning({ onClose }: UsageWarningProps) {
     onClose?.();
   };
 
-  const handleUpgrade = () => {
-    toast({
-      title: "Coming Soon",
-      description: "Payment integration will be available soon!",
-    });
-  };
-
   if (isLoading || !isVisible || !usageData) {
     return null;
   }
@@ -53,14 +46,12 @@ export function UsageWarning({ onClose }: UsageWarningProps) {
   // Check if any usage is above 80%
   const isNearLimit = 
     usageData.limits.links.percentage >= 80 ||
-    usageData.limits.api.percentage >= 80 ||
-    usageData.limits.domains.percentage >= 80;
+    usageData.limits.visitors.percentage >= 80;
 
   // Check if any usage is at 100%
   const isAtLimit = 
     usageData.limits.links.percentage >= 100 ||
-    usageData.limits.api.percentage >= 100 ||
-    usageData.limits.domains.percentage >= 100;
+    usageData.limits.visitors.percentage >= 100;
 
   if (!isNearLimit && !isAtLimit) {
     return null;
@@ -83,7 +74,7 @@ export function UsageWarning({ onClose }: UsageWarningProps) {
 
   const getWarningMessage = () => {
     if (isAtLimit) {
-      return 'You have reached your monthly limit. Upgrade your plan to continue creating links.';
+      return 'You have reached your monthly limit. Upgrade your plan to continue creating links and tracking visitors.';
     }
     return 'You are approaching your monthly usage limit. Consider upgrading your plan.';
   };
@@ -116,27 +107,14 @@ export function UsageWarning({ onClose }: UsageWarningProps) {
                   </div>
                 )}
                 
-                {usageData.limits.api.percentage >= 80 && (
+                {usageData.limits.visitors.percentage >= 80 && (
                   <div>
                     <div className="flex items-center justify-between text-xs mb-1">
-                      <span>API Requests</span>
-                      <span>{usageData.limits.api.current} / {usageData.limits.api.limit === -1 ? 'Unlimited' : usageData.limits.api.limit}</span>
+                      <span>Visitors Tracked</span>
+                      <span>{usageData.limits.visitors.current} / {usageData.limits.visitors.limit === null ? 'Unlimited' : usageData.limits.visitors.limit}</span>
                     </div>
                     <Progress 
-                      value={usageData.limits.api.percentage} 
-                      className="h-1.5" 
-                    />
-                  </div>
-                )}
-                
-                {usageData.limits.domains.percentage >= 80 && (
-                  <div>
-                    <div className="flex items-center justify-between text-xs mb-1">
-                      <span>Custom Domains</span>
-                      <span>{usageData.limits.domains.current} / {usageData.limits.domains.limit === -1 ? 'Unlimited' : usageData.limits.domains.limit}</span>
-                    </div>
-                    <Progress 
-                      value={usageData.limits.domains.percentage} 
+                      value={usageData.limits.visitors.percentage} 
                       className="h-1.5" 
                     />
                   </div>
@@ -146,7 +124,7 @@ export function UsageWarning({ onClose }: UsageWarningProps) {
               <div className="flex gap-2 mt-4">
                 <Button 
                   size="sm" 
-                  onClick={handleUpgrade}
+                  onClick={() => window.location.href = '/dashboard/subscription'}
                   className={isAtLimit ? 'bg-red-600 hover:bg-red-700' : 'bg-orange-600 hover:bg-orange-700'}
                 >
                   <ArrowUpRight className="h-4 w-4 mr-1" />

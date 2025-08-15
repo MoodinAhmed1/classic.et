@@ -10,16 +10,11 @@ import { useAuth } from '@/contexts/auth-context';
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: BarChart3 },
-  { name: 'Links', href: '/dashboard/links', icon: LinkIcon },
+  { name: 'Create Link', href: '/dashboard', icon: LinkIcon },
   { name: 'Analytics', href: '/dashboard/analytics', icon: BarChart3 },
-  { 
-    name: 'Domains', 
-    href: '/dashboard/domains', 
-    icon: Globe,
-    premium: true 
-  },
-  { name: 'Subscription', href: '/dashboard/subscription', icon: Crown },
+  { name: 'Links', href: '/dashboard/links', icon: LinkIcon },
   { name: 'Settings', href: '/dashboard/settings', icon: Settings },
+  { name: 'Subscription', href: '/dashboard/subscription', icon: Crown },
 ];
 
 export function DashboardSidebar() {
@@ -57,26 +52,19 @@ export function DashboardSidebar() {
       {/* Navigation */}
       <nav className="flex-1 px-4 py-6 space-y-2">
         {navigation.map((item) => {
-          const isActive = pathname === item.href;
           const Icon = item.icon;
-          
           return (
             <Link
               key={item.name}
               href={item.href}
-              className={`flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                isActive
-                  ? 'bg-blue-600 text-white'
-                  : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+              className={`flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                pathname === item.href
+                  ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-100'
+                  : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white'
               }`}
             >
               <Icon className="h-5 w-5 mr-3" />
               {item.name}
-              {item.premium && (
-                <Badge className="ml-auto bg-purple-600 text-white text-xs">
-                  Premium
-                </Badge>
-              )}
             </Link>
           );
         })}

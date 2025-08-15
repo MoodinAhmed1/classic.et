@@ -108,7 +108,8 @@ export default function LinksPage() {
   };
 
   const getShortUrl = (shortCode: string) => {
-    return `${window.location.origin}/${shortCode}`;
+    // Fix: Redirect to backend instead of frontend
+    return `https://back-end.xayrix1.workers.dev/${shortCode}`;
   };
 
   const isExpired = (expiresAt: string | null) => {
@@ -122,15 +123,15 @@ export default function LinksPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col space-y-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Links</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Links</h1>
           <p className="text-gray-600 mt-2">
             Manage all your shortened links in one place
           </p>
         </div>
         <Link href="/dashboard">
-          <Button>
+          <Button className="w-full sm:w-auto">
             <Plus className="mr-2 h-4 w-4" />
             Create Link
           </Button>
@@ -140,7 +141,7 @@ export default function LinksPage() {
       {/* Search and Filters */}
       <Card>
         <CardContent className="pt-6">
-          <div className="flex items-center space-x-4">
+          <div className="flex flex-col space-y-3 sm:flex-row sm:items-center sm:space-y-0 sm:space-x-4">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <Input
@@ -150,7 +151,7 @@ export default function LinksPage() {
                 className="pl-10"
               />
             </div>
-            <Button variant="outline">
+            <Button variant="outline" className="w-full sm:w-auto">
               <Filter className="mr-2 h-4 w-4" />
               Filter
             </Button>
