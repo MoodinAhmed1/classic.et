@@ -2,7 +2,7 @@
 
 ## Overview
 
-Your URL shortener now has a complete monetization system with tiered subscriptions, usage tracking, and Stripe payment integration. This guide covers everything you need to know to get started with monetization.
+Your URL shortener now has a complete monetization system with tiered subscriptions, usage tracking, and Chapa payment integration. This guide covers everything you need to know to get started with monetization.
 
 ## 🎯 Subscription Tiers
 
@@ -13,19 +13,15 @@ Your URL shortener now has a complete monetization system with tiered subscripti
 - No API access
 - Standard support
 
-### Pro Tier ($9.99/month)
+### Pro Tier (300 ETB/month)
 - **100 links per month**
 - Advanced analytics (30 days retention)
-- 1 custom domain
-- 1,000 API requests/month
 - Email support
 - Link scheduling & QR codes
 
-### Pro Extreme ($29.99/month)
+### Premium Tier (900 ETB/month)
 - **Unlimited links**
 - Full analytics (1 year retention)
-- 5 custom domains
-- Unlimited API access
 - Priority support
 - Team collaboration (up to 3 members)
 - White-label options
@@ -44,7 +40,7 @@ The system uses several new tables:
 ### Key Files
 
 - `back-end/src/subscription-utils.ts` - Core subscription logic
-- `back-end/src/stripe-integration.ts` - Stripe payment processing
+- `back-end/src/chapa-integration.ts` - Chapa payment processing
 - `front-end/src/app/dashboard/subscription/page.tsx` - Subscription management UI
 - `front-end/src/components/usage-warning.tsx` - Usage limit warnings
 
@@ -55,44 +51,44 @@ The system uses several new tables:
 Add these to your Cloudflare Workers environment:
 
 ```bash
-STRIPE_SECRET_KEY=sk_test_...  # Your Stripe secret key
-STRIPE_WEBHOOK_SECRET=whsec_... # Your Stripe webhook secret
+CHAPA_SECRET_KEY=CHASECK_TEST-...  # Your Chapa secret key
+CHAPA_PUBLIC_KEY=CHAPUBK_TEST-... # Your Chapa public key
+CHAPA_ENCRYPTION_KEY=... # Your Chapa encryption key
 ```
 
-### 2. Stripe Dashboard Setup
+### 2. Chapa Dashboard Setup
 
-1. **Create Products & Prices**:
-   - Go to Stripe Dashboard → Products
-   - Create products for "Pro" and "Pro Extreme" plans
-   - Set up monthly and yearly prices
-   - Copy the price IDs and update `STRIPE_PRICE_IDS` in `stripe-integration.ts`
+1. **Create Products & Plans**:
+   - Go to Chapa Dashboard → Products
+   - Create products for "Pro" and "Premium" plans
+   - Set up monthly and yearly prices in ETB
+   - Configure webhook endpoints
 
 2. **Configure Webhooks**:
-   - Go to Stripe Dashboard → Webhooks
-   - Add endpoint: `https://your-domain.workers.dev/api/webhooks/stripe`
+   - Go to Chapa Dashboard → Webhooks
+   - Add endpoint: `https://your-domain.workers.dev/api/webhooks/chapa`
    - Select these events:
-     - `customer.subscription.created`
-     - `customer.subscription.updated`
-     - `customer.subscription.deleted`
-     - `invoice.payment_succeeded`
-     - `invoice.payment_failed`
-   - Copy the webhook secret to your environment variables
+     - `payment_success`
+     - `payment_failed`
+   - Test webhook delivery
 
-### 3. Update Price IDs
+### 3. Update Pricing
 
-Edit `back-end/src/stripe-integration.ts` and replace the placeholder price IDs:
+The system now uses ETB pricing. Update the subscription plans in the database:
 
-```typescript
-export const STRIPE_PRICE_IDS = {
-  pro: {
-    monthly: 'price_1ABC123...', // Your actual Pro monthly price ID
-    yearly: 'price_1DEF456...',  // Your actual Pro yearly price ID
-  },
-  premium: {
-    monthly: 'price_1GHI789...', // Your actual Premium monthly price ID
-    yearly: 'price_1JKL012...',  // Your actual Premium yearly price ID
-  },
-} as const;
+```sql
+UPDATE subscription_plans 
+SET price_monthly = CASE 
+  WHEN tier = 'pro' THEN 30000  -- 300 ETB
+  WHEN tier = 'premium' THEN 90000  -- 900 ETB
+  ELSE price_monthly
+END,
+price_yearly = CASE 
+  WHEN tier = 'pro' THEN 300000  -- 3000 ETB (save 17%)
+  WHEN tier = 'premium' THEN 900000  -- 9000 ETB (save 17%)
+  ELSE price_yearly
+END
+WHERE tier IN ('pro', 'premium');
 ```
 
 ## 🎨 Frontend Features
@@ -130,15 +126,18 @@ GET /api/subscription/current
 // Get usage summary
 GET /api/subscription/usage
 
-// Create Stripe checkout session
+// Initialize Chapa payment
 POST /api/subscription/checkout
-Body: { planId: string, billingCycle: 'monthly' | 'yearly' }
+Body: { planId: string, billingCycle: 'monthly' | 'yearly', phoneNumber: string }
 
-// Open billing portal
+// Verify transaction
+GET /api/subscription/verify/:txRef
+
+// Open billing management
 POST /api/subscription/billing-portal
 
-// Stripe webhook
-POST /api/webhooks/stripe
+// Chapa webhook
+POST /api/webhooks/chapa
 ```
 
 ### Usage Tracking
@@ -187,12 +186,12 @@ The system automatically tracks:
 - [ ] Check billing portal access
 - [ ] Test responsive design
 
-### Stripe
-- [ ] Create products and prices
+### Chapa
+- [ ] Create products and plans
 - [ ] Configure webhook endpoint
 - [ ] Test payment flow
-- [ ] Set up billing portal
-- [ ] Configure tax settings (if applicable)
+- [ ] Set up billing management
+- [ ] Configure currency settings
 
 ## 📊 Analytics & Monitoring
 

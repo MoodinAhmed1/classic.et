@@ -20,7 +20,7 @@ import {
   canDownloadPDF,
   updateLastVisit
 } from './subscription-utils';
-import { StripeService, WebhookHandler, STRIPE_PRICE_IDS } from './stripe-integration';
+import { ChapaService, ChapaWebhookHandler } from './chapa-integration';
 
 interface Env {
   DB: D1Database;
@@ -28,8 +28,9 @@ interface Env {
   RESEND_API_KEY: string;
   FRONTEND_URL: string;
   FROM_EMAIL: string; // Optional, can be set to a verified domain email
-  STRIPE_SECRET_KEY: string;
-  STRIPE_WEBHOOK_SECRET: string;
+  CHAPA_SECRET_KEY: string;
+  CHAPA_PUBLIC_KEY: string;
+  CHAPA_ENCRYPTION_KEY: string;
 }
 
 interface User {
@@ -2510,14 +2511,14 @@ app.get('/api/subscription/current', authMiddleware, async (c) => {
   }
 });
 
-// Stripe checkout endpoints
+// Chapa payment initialization endpoint
 app.post('/api/subscription/checkout', authMiddleware, async (c) => {
   try {
     const payload = c.get('jwtPayload');
-    const { planId, billingCycle } = await c.req.json();
+    const { planId, billingCycle, phoneNumber } = await c.req.json();
 
-    if (!planId || !billingCycle) {
-      return c.json({ error: 'Plan ID and billing cycle are required' }, 400);
+    if (!planId || !billingCycle || !phoneNumber) {
+      return c.json({ error: 'Plan ID, billing cycle, and phone number are required' }, 400);
     }
 
     // Get user details
@@ -2535,38 +2536,65 @@ app.post('/api/subscription/checkout', authMiddleware, async (c) => {
       return c.json({ error: 'Invalid plan' }, 400);
     }
 
-    // Get price ID based on plan and billing cycle
-    const priceId = billingCycle === 'yearly' 
-      ? STRIPE_PRICE_IDS[plan.tier as keyof typeof STRIPE_PRICE_IDS]?.yearly
-      : STRIPE_PRICE_IDS[plan.tier as keyof typeof STRIPE_PRICE_IDS]?.monthly;
+    // Get price based on plan and billing cycle
+    const price = billingCycle === 'yearly' ? plan.price_yearly : plan.price_monthly;
+    
+    // Convert price from cents to ETB (assuming price is in cents)
+    const amountInETB = Math.round(price / 100 * 30); // Convert USD to ETB (approximate rate)
 
-    if (!priceId) {
-      return c.json({ error: 'Price not configured for this plan' }, 400);
+    // Initialize Chapa service
+    const chapaService = new ChapaService({
+      secretKey: c.env.CHAPA_SECRET_KEY,
+      publicKey: c.env.CHAPA_PUBLIC_KEY,
+      encryptionKey: c.env.CHAPA_ENCRYPTION_KEY,
+    });
+
+    // Generate unique transaction reference
+    const txRef = chapaService.generateTxRef(`PLAN_${plan.tier.toUpperCase()}`);
+
+    // Create payment
+    const payment = await chapaService.createPayment({
+      amount: amountInETB,
+      email: user.email,
+      firstName: user.name?.split(' ')[0] || 'User',
+      lastName: user.name?.split(' ').slice(1).join(' ') || 'User',
+      phoneNumber: phoneNumber,
+      txRef: txRef,
+      callbackUrl: `${c.env.FRONTEND_URL}/api/webhooks/chapa`,
+      returnUrl: `${c.env.FRONTEND_URL}/dashboard/subscription?success=true&tx_ref=${txRef}`,
+      title: `${plan.name} Plan Subscription`,
+      description: `${plan.name} plan subscription for ${billingCycle} billing cycle`,
+    });
+
+    if (payment.status === 'success' && payment.data?.checkout_url) {
+      // Store payment info in database for verification later
+      await c.env.DB.prepare(`
+        INSERT INTO payment_transactions (id, user_id, plan_id, tx_ref, amount, currency, billing_cycle, status, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).bind(
+        generateId(),
+        payload.userId,
+        planId,
+        txRef,
+        amountInETB,
+        'ETB',
+        billingCycle,
+        'pending',
+        new Date().toISOString()
+      ).run();
+
+      return c.json({
+        txRef: txRef,
+        url: payment.data.checkout_url,
+        amount: amountInETB,
+        currency: 'ETB'
+      });
+    } else {
+      return c.json({ error: 'Failed to initialize payment' }, 500);
     }
-
-    // Initialize Stripe service
-    const stripeService = new StripeService({
-      secretKey: c.env.STRIPE_SECRET_KEY,
-      webhookSecret: c.env.STRIPE_WEBHOOK_SECRET,
-    });
-
-    // Create checkout session
-    const session = await stripeService.createCheckoutSession({
-      planId,
-      planTier: plan.tier as 'pro' | 'premium',
-      priceId,
-      customerEmail: user.email,
-      successUrl: `${c.env.FRONTEND_URL}/dashboard/subscription?success=true`,
-      cancelUrl: `${c.env.FRONTEND_URL}/dashboard/subscription?canceled=true`,
-    });
-
-    return c.json({
-      sessionId: session.id,
-      url: session.url,
-    });
   } catch (error) {
-    console.error('Checkout error:', error);
-    return c.json({ error: 'Failed to create checkout session' }, 500);
+    console.error('Payment initialization error:', error);
+    return c.json({ error: 'Failed to initialize payment' }, 500);
   }
 });
 
@@ -2574,31 +2602,10 @@ app.post('/api/subscription/billing-portal', authMiddleware, async (c) => {
   try {
     const payload = c.get('jwtPayload');
     
-    // Get user's subscription ID
-    const user = await c.env.DB.prepare(`
-      SELECT subscription_id FROM users WHERE id = ?
-    `).bind(payload.userId).first() as any;
-
-    if (!user?.subscription_id) {
-      return c.json({ error: 'No active subscription found' }, 404);
-    }
-
-    // Get subscription details from Stripe
-    const stripeService = new StripeService({
-      secretKey: c.env.STRIPE_SECRET_KEY,
-      webhookSecret: c.env.STRIPE_WEBHOOK_SECRET,
-    });
-
-    const subscription = await stripeService.getSubscription(user.subscription_id);
-    
-    // Create billing portal session
-    const session = await stripeService.createBillingPortalSession(
-      subscription.customer as string,
-      `${c.env.FRONTEND_URL}/dashboard/subscription`
-    );
-
+    // For Chapa, we'll redirect to a billing management page
+    // Since Chapa doesn't have a billing portal like Stripe
     return c.json({
-      url: session.url,
+      url: `${c.env.FRONTEND_URL}/dashboard/subscription?manage=true`,
     });
   } catch (error) {
     console.error('Billing portal error:', error);
@@ -2606,52 +2613,96 @@ app.post('/api/subscription/billing-portal', authMiddleware, async (c) => {
   }
 });
 
-// Webhook endpoint for Stripe
-app.post('/api/webhooks/stripe', async (c) => {
+// Webhook endpoint for Chapa
+app.post('/api/webhooks/chapa', async (c) => {
   try {
-    const body = await c.req.text();
-    const signature = c.req.header('stripe-signature');
+    const body = await c.req.json();
     
-    if (!signature) {
-      return c.json({ error: 'No signature provided' }, 400);
-    }
-
-    // Initialize Stripe service and webhook handler
-    const stripeService = new StripeService({
-      secretKey: c.env.STRIPE_SECRET_KEY,
-      webhookSecret: c.env.STRIPE_WEBHOOK_SECRET,
-    });
-
-    const webhookHandler = new WebhookHandler(c.env.DB);
-
-    // Verify webhook signature
-    const event = stripeService.verifyWebhookSignature(body, signature, c.env.STRIPE_WEBHOOK_SECRET);
+    // Initialize Chapa webhook handler
+    const webhookHandler = new ChapaWebhookHandler(c.env.DB);
 
     // Handle different event types
-    switch (event.type) {
-      case 'customer.subscription.created':
-        await webhookHandler.handleSubscriptionCreated(event);
+    switch (body.event) {
+      case 'payment_success':
+        await webhookHandler.handlePaymentSuccess(body);
         break;
-      case 'customer.subscription.updated':
-        await webhookHandler.handleSubscriptionUpdated(event);
-        break;
-      case 'customer.subscription.deleted':
-        await webhookHandler.handleSubscriptionDeleted(event);
-        break;
-      case 'invoice.payment_succeeded':
-        await webhookHandler.handleInvoicePaymentSucceeded(event);
-        break;
-      case 'invoice.payment_failed':
-        await webhookHandler.handleInvoicePaymentFailed(event);
+      case 'payment_failed':
+        await webhookHandler.handlePaymentFailed(body);
         break;
       default:
-        console.log(`Unhandled event type: ${event.type}`);
+        console.log(`Unhandled event type: ${body.event}`);
     }
     
     return c.json({ received: true });
   } catch (error) {
-    console.error('Stripe webhook error:', error);
+    console.error('Chapa webhook error:', error);
     return c.json({ error: 'Webhook error' }, 400);
+  }
+});
+
+// Transaction verification endpoint
+app.get('/api/subscription/verify/:txRef', async (c) => {
+  try {
+    const txRef = c.req.param('txRef');
+    
+    // Initialize Chapa service
+    const chapaService = new ChapaService({
+      secretKey: c.env.CHAPA_SECRET_KEY,
+      publicKey: c.env.CHAPA_PUBLIC_KEY,
+      encryptionKey: c.env.CHAPA_ENCRYPTION_KEY,
+    });
+
+    // Verify transaction with Chapa
+    const verification = await chapaService.verifyTransaction(txRef);
+    
+    if (verification.status === 'success' && verification.data) {
+      // Update payment transaction status in database
+      await c.env.DB.prepare(`
+        UPDATE payment_transactions 
+        SET status = ?, updated_at = ?
+        WHERE tx_ref = ?
+      `).bind(
+        verification.data.status,
+        new Date().toISOString(),
+        txRef
+      ).run();
+
+      // If payment is successful, update user subscription
+      if (verification.data.status === 'success') {
+        // Get payment transaction details
+        const transaction = await c.env.DB.prepare(`
+          SELECT user_id, plan_id, billing_cycle FROM payment_transactions 
+          WHERE tx_ref = ?
+        `).bind(txRef).first() as any;
+
+        if (transaction) {
+          // Update user subscription
+          await c.env.DB.prepare(`
+            UPDATE users 
+            SET tier = ?, subscription_status = 'active', 
+                current_period_start = ?, current_period_end = ?
+            WHERE id = ?
+          `).bind(
+            transaction.plan_id,
+            new Date().toISOString(),
+            new Date(Date.now() + (transaction.billing_cycle === 'yearly' ? 365 : 30) * 24 * 60 * 60 * 1000).toISOString(),
+            transaction.user_id
+          ).run();
+        }
+      }
+
+      return c.json({
+        status: verification.data.status,
+        txRef: verification.data.tx_ref,
+        amount: verification.data.amount,
+        currency: verification.data.currency
+      });
+    } else {
+      return c.json({ error: 'Transaction verification failed' }, 400);
+    }
+  } catch (error) {
+    console.error('Transaction verification error:', error);
+    return c.json({ error: 'Failed to verify transaction' }, 500);
   }
 });
 

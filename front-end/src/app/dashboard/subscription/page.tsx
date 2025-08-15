@@ -105,12 +105,58 @@ export default function SubscriptionPage() {
   const [usageSummary, setUsageSummary] = useState<UsageSummary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isUpgrading, setIsUpgrading] = useState(false);
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [showPhoneModal, setShowPhoneModal] = useState(false);
+  const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
+  const [selectedBillingCycle, setSelectedBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
   const { user } = useAuth();
   const { toast } = useToast();
 
   useEffect(() => {
     fetchSubscriptionData();
+    
+    // Check for payment success/failure in URL params
+    const urlParams = new URLSearchParams(window.location.search);
+    const success = urlParams.get('success');
+    const txRef = urlParams.get('tx_ref');
+    
+    if (success === 'true' && txRef) {
+      // Verify the transaction
+      verifyTransaction(txRef);
+    }
   }, []);
+
+  const verifyTransaction = async (txRef: string) => {
+    try {
+      const result = await subscriptionApi.verifyTransaction(txRef);
+      
+      if (result.status === 'success') {
+        toast({
+          title: "Payment Successful!",
+          description: "Your subscription has been activated. Welcome to the premium plan!",
+          variant: "default",
+        });
+        
+        // Refresh subscription data
+        fetchSubscriptionData();
+        
+        // Clean up URL
+        window.history.replaceState({}, document.title, window.location.pathname);
+      } else {
+        toast({
+          title: "Payment Verification Failed",
+          description: "Please contact support if you believe this is an error.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Verification Error",
+        description: "Failed to verify payment. Please contact support.",
+        variant: "destructive",
+      });
+    }
+  };
 
   const fetchSubscriptionData = async () => {
     setIsLoading(true);
@@ -140,37 +186,36 @@ export default function SubscriptionPage() {
     }
   };
 
-  const handleUpgrade = async (planId: string) => {
+  const handleUpgrade = async (planId: string, billingCycle: 'monthly' | 'yearly' = 'monthly') => {
+    setSelectedPlan(planId);
+    setSelectedBillingCycle(billingCycle);
+    setShowPhoneModal(true);
+  };
+
+  const handlePayment = async () => {
+    if (!phoneNumber || !selectedPlan) return;
+    
     setIsUpgrading(true);
     try {
-      const response = await fetch('/api/subscription/checkout', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          planId,
-          billingCycle: 'monthly', // Default to monthly, can be made configurable
-        }),
+      const response = await subscriptionApi.initializePayment({
+        planId: selectedPlan,
+        billingCycle: selectedBillingCycle,
+        phoneNumber: phoneNumber,
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to create checkout session');
-      }
-
-      const { url } = await response.json();
-      
-      // Redirect to Stripe checkout
-      window.location.href = url;
+      // Redirect to Chapa checkout
+      window.location.href = response.url;
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to process upgrade. Please try again.",
+        description: "Failed to process payment. Please try again.",
         variant: "destructive",
       });
     } finally {
       setIsUpgrading(false);
+      setShowPhoneModal(false);
+      setPhoneNumber('');
+      setSelectedPlan(null);
     }
   };
 
@@ -228,7 +273,7 @@ export default function SubscriptionPage() {
   };
 
   const formatPrice = (price: number) => {
-    return `$${(price / 100).toFixed(2)}`;
+    return `${(price / 100).toFixed(0)} ETB`;
   };
 
   const formatLimit = (limit: number | null) => {
@@ -459,20 +504,38 @@ export default function SubscriptionPage() {
                     </div>
                   </div>
                   
-                  <Button 
-                    className="w-full" 
-                    variant={currentSubscription?.user.tier === plan.tier ? "outline" : "default"}
-                    disabled={currentSubscription?.user.tier === plan.tier || isUpgrading}
-                    onClick={() => handleUpgrade(plan.id)}
-                  >
-                    {isUpgrading ? (
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    ) : currentSubscription?.user.tier === plan.tier ? (
-                      'Current Plan'
-                    ) : (
-                      'Upgrade'
+                  <div className="space-y-2">
+                    <Button 
+                      className="w-full" 
+                      variant={currentSubscription?.user.tier === plan.tier ? "outline" : "default"}
+                      disabled={currentSubscription?.user.tier === plan.tier || isUpgrading}
+                      onClick={() => handleUpgrade(plan.id, 'monthly')}
+                    >
+                      {isUpgrading ? (
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      ) : currentSubscription?.user.tier === plan.tier ? (
+                        'Current Plan'
+                      ) : (
+                        'Monthly'
+                      )}
+                    </Button>
+                    {plan.priceYearly > 0 && (
+                      <Button 
+                        className="w-full" 
+                        variant="outline"
+                        disabled={currentSubscription?.user.tier === plan.tier || isUpgrading}
+                        onClick={() => handleUpgrade(plan.id, 'yearly')}
+                      >
+                        {isUpgrading ? (
+                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        ) : currentSubscription?.user.tier === plan.tier ? (
+                          'Current Plan'
+                        ) : (
+                          'Yearly (Save 17%)'
+                        )}
+                      </Button>
                     )}
-                  </Button>
+                  </div>
                 </CardContent>
               </Card>
             ))}
@@ -545,6 +608,49 @@ export default function SubscriptionPage() {
           )}
         </TabsContent>
       </Tabs>
+
+      {/* Phone Number Modal */}
+      {showPhoneModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4">
+            <h3 className="text-lg font-semibold mb-4">Enter Phone Number</h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              Please enter your phone number to continue with the payment.
+            </p>
+            <input
+              type="tel"
+              placeholder="Phone Number (e.g., +251912345678)"
+              value={phoneNumber}
+              onChange={(e) => setPhoneNumber(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+            />
+            <div className="flex gap-3 mt-6">
+              <Button
+                onClick={() => {
+                  setShowPhoneModal(false);
+                  setPhoneNumber('');
+                  setSelectedPlan(null);
+                }}
+                variant="outline"
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handlePayment}
+                disabled={!phoneNumber.trim() || isUpgrading}
+                className="flex-1"
+              >
+                {isUpgrading ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                ) : (
+                  'Continue to Payment'
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
