@@ -18,7 +18,9 @@
 		}
 	],
 	"vars": {
-		"FRONTEND_URL": "http://localhost:3000"
+		"FRONTEND_URL": "http://localhost:3000",
+		"CHAPA_PUBLIC_KEY": "CHAPUBK_TEST-VtlmEwU9uDnJiSUbGFMaJD3QQR5q8tfE",
+		"CHAPA_ENCRYPTION_KEY": "pYCpnNsI0eiDFpKkC96eDoTW"
 	}
 	
 	/**

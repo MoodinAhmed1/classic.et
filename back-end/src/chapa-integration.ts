@@ -84,7 +84,14 @@ export class ChapaService {
         body: raw,
       });
 
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Chapa API error:', response.status, errorText);
+        throw new Error(`Chapa API error: ${response.status} - ${errorText}`);
+      }
+
       const result = await response.json() as PaymentResponse;
+      console.log('Chapa payment response:', result);
       return result;
     } catch (error) {
       console.error('Chapa payment initialization error:', error);

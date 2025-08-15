@@ -2514,8 +2514,11 @@ app.get('/api/subscription/current', authMiddleware, async (c) => {
 // Chapa payment initialization endpoint
 app.post('/api/subscription/checkout', authMiddleware, async (c) => {
   try {
+    console.log('Payment checkout request received');
     const payload = c.get('jwtPayload');
+    console.log('JWT payload:', payload);
     const { planId, billingCycle, phoneNumber } = await c.req.json();
+    console.log('Request body:', { planId, billingCycle, phoneNumber });
 
     if (!planId || !billingCycle || !phoneNumber) {
       return c.json({ error: 'Plan ID, billing cycle, and phone number are required' }, 400);
@@ -2531,7 +2534,9 @@ app.post('/api/subscription/checkout', authMiddleware, async (c) => {
     }
 
     // Get plan details
+    console.log('Looking up plan with ID:', planId);
     const plan = await getSubscriptionPlan(c.env.DB, planId);
+    console.log('Plan found:', plan);
     if (!plan) {
       return c.json({ error: 'Invalid plan' }, 400);
     }
@@ -2539,8 +2544,8 @@ app.post('/api/subscription/checkout', authMiddleware, async (c) => {
     // Get price based on plan and billing cycle
     const price = billingCycle === 'yearly' ? plan.price_yearly : plan.price_monthly;
     
-    // Convert price from cents to ETB (assuming price is in cents)
-    const amountInETB = Math.round(price / 100 * 30); // Convert USD to ETB (approximate rate)
+    // Price is already in ETB (cents), convert to ETB
+    const amountInETB = Math.round(price / 100);
 
     // Initialize Chapa service
     const chapaService = new ChapaService({
@@ -2560,12 +2565,14 @@ app.post('/api/subscription/checkout', authMiddleware, async (c) => {
       lastName: user.name?.split(' ').slice(1).join(' ') || 'User',
       phoneNumber: phoneNumber,
       txRef: txRef,
-      callbackUrl: `${c.env.FRONTEND_URL}/api/webhooks/chapa`,
+      callbackUrl: `https://back-end.xayrix1.workers.dev/api/webhooks/chapa`,
       returnUrl: `${c.env.FRONTEND_URL}/dashboard/subscription?success=true&tx_ref=${txRef}`,
       title: `${plan.name} Plan Subscription`,
       description: `${plan.name} plan subscription for ${billingCycle} billing cycle`,
     });
 
+    console.log('Payment response:', payment);
+    
     if (payment.status === 'success' && payment.data?.checkout_url) {
       // Store payment info in database for verification later
       await c.env.DB.prepare(`
@@ -2590,7 +2597,12 @@ app.post('/api/subscription/checkout', authMiddleware, async (c) => {
         currency: 'ETB'
       });
     } else {
-      return c.json({ error: 'Failed to initialize payment' }, 500);
+      console.error('Payment failed:', payment);
+      return c.json({ 
+        error: 'Failed to initialize payment', 
+        details: payment.message || 'Unknown error',
+        status: payment.status 
+      }, 500);
     }
   } catch (error) {
     console.error('Payment initialization error:', error);
@@ -2629,8 +2641,14 @@ app.post('/api/webhooks/chapa', async (c) => {
       case 'payment_failed':
         await webhookHandler.handlePaymentFailed(body);
         break;
+      case 'charge.failed':
+      case 'charge.cancelled':
+        // Handle failed/cancelled charges
+        console.log(`Charge ${body.event}:`, body.data);
+        await webhookHandler.handlePaymentFailed(body);
+        break;
       default:
-        console.log(`Unhandled event type: ${body.event}`);
+        console.log(`Unhandled event type: ${body.event}`, body.data);
     }
     
     return c.json({ received: true });
