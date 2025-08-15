@@ -19,8 +19,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Search, Plus, Copy, ExternalLink, BarChart3, MoreHorizontal, Edit, Trash2, Filter } from 'lucide-react';
+import { Search, Plus, Copy, ExternalLink, BarChart3, MoreHorizontal, Edit, Trash2, Filter, QrCode } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/auth-context';
 import { linksApi } from '@/lib/api';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -41,7 +42,10 @@ export default function LinksPage() {
   const [filteredLinks, setFilteredLinks] = useState<LinkData[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [showQRModal, setShowQRModal] = useState(false);
+  const [selectedLink, setSelectedLink] = useState<LinkData | null>(null);
   const { toast } = useToast();
+  const { user } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
@@ -105,6 +109,16 @@ export default function LinksPage() {
         variant: "destructive",
       });
     }
+  };
+
+  const handleShowQR = (link: LinkData) => {
+    setSelectedLink(link);
+    setShowQRModal(true);
+  };
+
+  const generateQRCode = (url: string) => {
+    // Simple QR code generation using a service
+    return `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(url)}`;
   };
 
   const getShortUrl = (shortCode: string) => {
@@ -257,6 +271,16 @@ export default function LinksPage() {
                           >
                             <ExternalLink className="h-4 w-4" />
                           </Button>
+                          {user?.tier !== 'free' && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleShowQR(link)}
+                              title="Generate QR Code"
+                            >
+                              <QrCode className="h-4 w-4" />
+                            </Button>
+                          )}
                           <Button
                             size="sm"
                             variant="ghost"
@@ -295,6 +319,63 @@ export default function LinksPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* QR Code Modal */}
+      {showQRModal && selectedLink && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">QR Code</h3>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowQRModal(false)}
+                className="h-6 w-6 p-0"
+              >
+                ×
+              </Button>
+            </div>
+            
+            <div className="text-center space-y-4">
+              <div className="bg-gray-100 dark:bg-gray-700 p-4 rounded-lg">
+                <img
+                  src={generateQRCode(getShortUrl(selectedLink.shortCode))}
+                  alt="QR Code"
+                  className="mx-auto"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  <strong>Link:</strong> {selectedLink.title || 'Untitled'}
+                </p>
+                <p className="text-sm text-gray-600 dark:text-gray-400 font-mono">
+                  {getShortUrl(selectedLink.shortCode)}
+                </p>
+              </div>
+              
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    const qrUrl = generateQRCode(getShortUrl(selectedLink.shortCode));
+                    window.open(qrUrl, '_blank');
+                  }}
+                  className="flex-1"
+                >
+                  Download QR
+                </Button>
+                <Button
+                  onClick={() => setShowQRModal(false)}
+                  className="flex-1"
+                >
+                  Close
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

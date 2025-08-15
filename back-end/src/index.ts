@@ -2569,7 +2569,7 @@ app.post('/api/subscription/checkout', authMiddleware, async (c) => {
       phoneNumber: phoneNumber,
       txRef: txRef,
       callbackUrl: `${c.env.FRONTEND_URL}/api/webhooks/chapa`,
-      returnUrl: `${c.env.FRONTEND_URL}/dashboard/subscription?success=true&tx_ref=${txRef}`,
+      returnUrl: `${c.env.FRONTEND_URL}/dashboard/subscription/receipt?tx_ref=${txRef}`,
       title: `${plan.name} Plan Subscription`,
       description: `${plan.name} plan subscription for ${billingCycle} billing cycle`,
     });

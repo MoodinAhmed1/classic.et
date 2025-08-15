@@ -99,7 +99,8 @@ export class ChapaService {
       return_url: params.returnUrl,
       "customization[title]": params.title,
       "customization[description]": params.description,
-      "meta[hide_receipt]": "true"
+      "meta[hide_receipt]": "false",
+      "meta[redirect_delay]": "15"
     };
 
     try {

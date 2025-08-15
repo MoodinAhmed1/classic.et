@@ -53,6 +53,11 @@ export function UsageWarning({ onClose }: UsageWarningProps) {
     usageData.limits.links.percentage >= 100 ||
     usageData.limits.visitors.percentage >= 100;
 
+  // Don't show warning for Premium users
+  if (usageData?.plan?.tier === 'premium') {
+    return null;
+  }
+
   if (!isNearLimit && !isAtLimit) {
     return null;
   }
@@ -128,7 +133,7 @@ export function UsageWarning({ onClose }: UsageWarningProps) {
                   className={isAtLimit ? 'bg-red-600 hover:bg-red-700' : 'bg-orange-600 hover:bg-orange-700'}
                 >
                   <ArrowUpRight className="h-4 w-4 mr-1" />
-                  Upgrade Plan
+                  {usageData?.plan?.tier === 'free' ? 'Upgrade Plan' : 'Upgrade to Premium'}
                 </Button>
                 <Button 
                   size="sm" 

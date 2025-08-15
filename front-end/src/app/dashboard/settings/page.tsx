@@ -213,7 +213,9 @@ export default function SettingsPage() {
           <TabsTrigger value="profile">Profile</TabsTrigger>
           <TabsTrigger value="security">Security</TabsTrigger>
           <TabsTrigger value="notifications">Notifications</TabsTrigger>
-          <TabsTrigger value="api">API</TabsTrigger>
+          {user?.tier === 'premium' && (
+            <TabsTrigger value="api">API</TabsTrigger>
+          )}
           <TabsTrigger value="billing">Billing</TabsTrigger>
         </TabsList>
 
@@ -338,28 +340,7 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Two-Factor Authentication</CardTitle>
-              <CardDescription>
-                Add an extra layer of security to your account
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center justify-between">
-                <div>
-                  <h4 className="font-medium">Two-Factor Authentication</h4>
-                  <p className="text-sm text-muted-foreground">
-                    Secure your account with 2FA via authenticator app
-                  </p>
-                </div>
-                <Button variant="outline">
-                  <Key className="mr-2 h-4 w-4" />
-                  Enable 2FA
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+
         </TabsContent>
 
         <TabsContent value="notifications" className="space-y-6">
@@ -581,9 +562,12 @@ export default function SettingsPage() {
                         Manage your payment method and billing details
                       </p>
                     </div>
-                    <Button variant="outline">
+                    <Button 
+                      variant="outline"
+                      onClick={() => window.location.href = '/dashboard/subscription'}
+                    >
                       <Mail className="mr-2 h-4 w-4" />
-                      Update Billing
+                      Manage Billing
                     </Button>
                   </div>
 
@@ -596,9 +580,13 @@ export default function SettingsPage() {
                         Cancel your subscription and downgrade to free plan
                       </p>
                     </div>
-                    <Button variant="outline" className="text-red-600 border-red-200 hover:bg-red-50">
+                    <Button 
+                      variant="outline" 
+                      className="text-red-600 border-red-200 hover:bg-red-50"
+                      onClick={() => window.location.href = '/dashboard/subscription'}
+                    >
                       <Trash2 className="mr-2 h-4 w-4" />
-                      Cancel Plan
+                      Manage Subscription
                     </Button>
                   </div>
                 </div>

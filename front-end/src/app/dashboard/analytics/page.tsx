@@ -613,11 +613,16 @@ export default function AnalyticsPage() {
                   <div className="text-center py-8">
                     <Lock className="h-12 w-12 mx-auto mb-4 text-gray-400" />
                     <h3 className="text-lg font-medium text-gray-900 mb-2">Country Analytics Locked</h3>
-                    <p className="text-gray-600 mb-4">Upgrade to Pro or Premium to see country analytics.</p>
+                    <p className="text-gray-600 mb-4">
+                      {user?.tier === 'free' 
+                        ? 'Upgrade to Pro or Premium to see country analytics.'
+                        : 'Upgrade to Premium to see advanced country analytics.'
+                      }
+                    </p>
                     <Link href="/dashboard/subscription">
                       <Button>
                         <ArrowUpRight className="mr-2 h-4 w-4" />
-                        Upgrade Plan
+                        {user?.tier === 'free' ? 'Upgrade Plan' : 'Upgrade to Premium'}
                       </Button>
                     </Link>
                   </div>
@@ -678,11 +683,16 @@ export default function AnalyticsPage() {
                   <div className="text-center py-8">
                     <Lock className="h-12 w-12 mx-auto mb-4 text-gray-400" />
                     <h3 className="text-lg font-medium text-gray-900 mb-2">Device Analytics Locked</h3>
-                    <p className="text-gray-600 mb-4">Upgrade to Pro or Premium to see device analytics.</p>
+                    <p className="text-gray-600 mb-4">
+                      {user?.tier === 'free' 
+                        ? 'Upgrade to Pro or Premium to see device analytics.'
+                        : 'Upgrade to Premium to see advanced device analytics.'
+                      }
+                    </p>
                     <Link href="/dashboard/subscription">
                       <Button>
                         <ArrowUpRight className="mr-2 h-4 w-4" />
-                        Upgrade Plan
+                        {user?.tier === 'free' ? 'Upgrade Plan' : 'Upgrade to Premium'}
                       </Button>
                     </Link>
                   </div>
@@ -830,11 +840,16 @@ export default function AnalyticsPage() {
                   <div className="text-center py-8">
                     <Lock className="h-12 w-12 mx-auto mb-4 text-gray-400" />
                     <h3 className="text-lg font-medium text-gray-900 mb-2">Country Analytics Locked</h3>
-                    <p className="text-gray-600 mb-4">Upgrade to Pro or Premium to see country analytics.</p>
+                    <p className="text-gray-600 mb-4">
+                      {user?.tier === 'free' 
+                        ? 'Upgrade to Pro or Premium to see country analytics.'
+                        : 'Upgrade to Premium to see advanced country analytics.'
+                      }
+                    </p>
                     <Link href="/dashboard/subscription">
                       <Button>
                         <ArrowUpRight className="mr-2 h-4 w-4" />
-                        Upgrade Plan
+                        {user?.tier === 'free' ? 'Upgrade Plan' : 'Upgrade to Premium'}
                       </Button>
                     </Link>
                   </div>
