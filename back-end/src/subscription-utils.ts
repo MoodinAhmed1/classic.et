@@ -81,6 +81,21 @@ export async function getSubscriptionPlan(db: D1Database, tier: string): Promise
   };
 }
 
+// Get subscription plan by ID (for checkout flow)
+export async function getSubscriptionPlanById(db: D1Database, id: string): Promise<SubscriptionPlan | null> {
+  const plan = await db.prepare(`
+    SELECT * FROM subscription_plans WHERE id = ?
+  `).bind(id).first() as any;
+
+  if (!plan) return null;
+
+  return {
+    ...plan,
+    features: JSON.parse(plan.features),
+    limits: JSON.parse(plan.limits)
+  };
+}
+
 // Get or create usage tracking for current month
 export async function getOrCreateUsageTracking(db: D1Database, userId: string): Promise<UsageTracking> {
   const currentMonth = getCurrentMonth();

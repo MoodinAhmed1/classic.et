@@ -118,9 +118,10 @@ export default function SubscriptionPage() {
     // Check for payment success/failure in URL params
     const urlParams = new URLSearchParams(window.location.search);
     const success = urlParams.get('success');
-    const txRef = urlParams.get('tx_ref');
+    const status = urlParams.get('status');
+    const txRef = urlParams.get('tx_ref') || urlParams.get('txRef') || urlParams.get('reference');
     
-    if (success === 'true' && txRef) {
+    if ((success === 'true' || status === 'success') && txRef) {
       // Verify the transaction
       verifyTransaction(txRef);
     }
@@ -203,6 +204,7 @@ export default function SubscriptionPage() {
         phoneNumber: phoneNumber,
       });
 
+      console.log('Chapa init response:', response);
       // Redirect to Chapa checkout
       window.location.href = response.url;
     } catch (error) {

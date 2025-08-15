@@ -11,6 +11,7 @@ import {
   incrementUsage, 
   getUserUsageSummary, 
   getSubscriptionPlan,
+  getSubscriptionPlanById,
   hasFeatureAccess,
   getAnalyticsRetentionDays,
   checkVisitorCap,
@@ -31,6 +32,7 @@ interface Env {
   CHAPA_SECRET_KEY: string;
   CHAPA_PUBLIC_KEY: string;
   CHAPA_ENCRYPTION_KEY: string;
+  CHAPA_WEBHOOK_SECRET?: string;
 }
 
 interface User {
@@ -2511,14 +2513,19 @@ app.get('/api/subscription/current', authMiddleware, async (c) => {
   }
 });
 
-// Chapa payment initialization endpoint
+// ============================================================================
+// CHAPA PAYMENT INTEGRATION ROUTES
+// ============================================================================
+
+/**
+ * Initialize Chapa payment checkout
+ * Creates payment session and returns checkout URL
+ */
 app.post('/api/subscription/checkout', authMiddleware, async (c) => {
   try {
     console.log('Payment checkout request received');
     const payload = c.get('jwtPayload');
-    console.log('JWT payload:', payload);
     const { planId, billingCycle, phoneNumber } = await c.req.json();
-    console.log('Request body:', { planId, billingCycle, phoneNumber });
 
     if (!planId || !billingCycle || !phoneNumber) {
       return c.json({ error: 'Plan ID, billing cycle, and phone number are required' }, 400);
@@ -2533,19 +2540,15 @@ app.post('/api/subscription/checkout', authMiddleware, async (c) => {
       return c.json({ error: 'User not found' }, 404);
     }
 
-    // Get plan details
-    console.log('Looking up plan with ID:', planId);
-    const plan = await getSubscriptionPlan(c.env.DB, planId);
-    console.log('Plan found:', plan);
+    // Get plan details by ID
+    const plan = await getSubscriptionPlanById(c.env.DB, planId);
     if (!plan) {
       return c.json({ error: 'Invalid plan' }, 400);
     }
 
-    // Get price based on plan and billing cycle
+    // Calculate price based on billing cycle
     const price = billingCycle === 'yearly' ? plan.price_yearly : plan.price_monthly;
-    
-    // Price is already in ETB (cents), convert to ETB
-    const amountInETB = Math.round(price / 100);
+    const amountInETB = Math.round(price / 100); // Convert from cents to ETB
 
     // Initialize Chapa service
     const chapaService = new ChapaService({
@@ -2557,7 +2560,7 @@ app.post('/api/subscription/checkout', authMiddleware, async (c) => {
     // Generate unique transaction reference
     const txRef = chapaService.generateTxRef(`PLAN_${plan.tier.toUpperCase()}`);
 
-    // Create payment
+    // Create payment with Chapa
     const payment = await chapaService.createPayment({
       amount: amountInETB,
       email: user.email,
@@ -2565,14 +2568,12 @@ app.post('/api/subscription/checkout', authMiddleware, async (c) => {
       lastName: user.name?.split(' ').slice(1).join(' ') || 'User',
       phoneNumber: phoneNumber,
       txRef: txRef,
-      callbackUrl: `https://back-end.xayrix1.workers.dev/api/webhooks/chapa`,
+      callbackUrl: `${c.env.FRONTEND_URL}/api/webhooks/chapa`,
       returnUrl: `${c.env.FRONTEND_URL}/dashboard/subscription?success=true&tx_ref=${txRef}`,
       title: `${plan.name} Plan Subscription`,
       description: `${plan.name} plan subscription for ${billingCycle} billing cycle`,
     });
 
-    console.log('Payment response:', payment);
-    
     if (payment.status === 'success' && payment.data?.checkout_url) {
       // Store payment info in database for verification later
       await c.env.DB.prepare(`
@@ -2610,55 +2611,10 @@ app.post('/api/subscription/checkout', authMiddleware, async (c) => {
   }
 });
 
-app.post('/api/subscription/billing-portal', authMiddleware, async (c) => {
-  try {
-    const payload = c.get('jwtPayload');
-    
-    // For Chapa, we'll redirect to a billing management page
-    // Since Chapa doesn't have a billing portal like Stripe
-    return c.json({
-      url: `${c.env.FRONTEND_URL}/dashboard/subscription?manage=true`,
-    });
-  } catch (error) {
-    console.error('Billing portal error:', error);
-    return c.json({ error: 'Failed to create billing portal session' }, 500);
-  }
-});
-
-// Webhook endpoint for Chapa
-app.post('/api/webhooks/chapa', async (c) => {
-  try {
-    const body = await c.req.json();
-    
-    // Initialize Chapa webhook handler
-    const webhookHandler = new ChapaWebhookHandler(c.env.DB);
-
-    // Handle different event types
-    switch (body.event) {
-      case 'payment_success':
-        await webhookHandler.handlePaymentSuccess(body);
-        break;
-      case 'payment_failed':
-        await webhookHandler.handlePaymentFailed(body);
-        break;
-      case 'charge.failed':
-      case 'charge.cancelled':
-        // Handle failed/cancelled charges
-        console.log(`Charge ${body.event}:`, body.data);
-        await webhookHandler.handlePaymentFailed(body);
-        break;
-      default:
-        console.log(`Unhandled event type: ${body.event}`, body.data);
-    }
-    
-    return c.json({ received: true });
-  } catch (error) {
-    console.error('Chapa webhook error:', error);
-    return c.json({ error: 'Webhook error' }, 400);
-  }
-});
-
-// Transaction verification endpoint
+/**
+ * Verify Chapa transaction status
+ * Called after payment completion to confirm status
+ */
 app.get('/api/subscription/verify/:txRef', async (c) => {
   try {
     const txRef = c.req.param('txRef');
@@ -2687,21 +2643,22 @@ app.get('/api/subscription/verify/:txRef', async (c) => {
 
       // If payment is successful, update user subscription
       if (verification.data.status === 'success') {
-        // Get payment transaction details
         const transaction = await c.env.DB.prepare(`
           SELECT user_id, plan_id, billing_cycle FROM payment_transactions 
           WHERE tx_ref = ?
         `).bind(txRef).first() as any;
 
         if (transaction) {
-          // Update user subscription
+          const paidPlan = await getSubscriptionPlanById(c.env.DB, transaction.plan_id);
+          const newTier = paidPlan?.tier || 'pro';
+
           await c.env.DB.prepare(`
             UPDATE users 
             SET tier = ?, subscription_status = 'active', 
                 current_period_start = ?, current_period_end = ?
             WHERE id = ?
           `).bind(
-            transaction.plan_id,
+            newTier,
             new Date().toISOString(),
             new Date(Date.now() + (transaction.billing_cycle === 'yearly' ? 365 : 30) * 24 * 60 * 60 * 1000).toISOString(),
             transaction.user_id
@@ -2721,6 +2678,196 @@ app.get('/api/subscription/verify/:txRef', async (c) => {
   } catch (error) {
     console.error('Transaction verification error:', error);
     return c.json({ error: 'Failed to verify transaction' }, 500);
+  }
+});
+
+/**
+ * Chapa webhook endpoint (POST)
+ * Receives real-time payment notifications from Chapa
+ */
+app.post('/api/webhooks/chapa', async (c) => {
+  try {
+    // Read raw body for signature verification
+    const rawBody = await c.req.text();
+
+    // Verify webhook signature when secret is configured
+    const secret = c.env.CHAPA_WEBHOOK_SECRET;
+    const signatureHeader = c.req.header('chapa-signature') || c.req.header('x-chapa-signature');
+    
+    if (secret) {
+      if (!signatureHeader) {
+        console.error('Missing Chapa signature header');
+        return c.json({ error: 'Signature missing' }, 401);
+      }
+
+      // Verify HMAC-SHA256 signature
+      const encoder = new TextEncoder();
+      const key = await crypto.subtle.importKey(
+        'raw',
+        encoder.encode(secret),
+        { name: 'HMAC', hash: 'SHA-256' },
+        false,
+        ['sign']
+      );
+
+      // Check both signature types (body and secret)
+      const macBody = await crypto.subtle.sign('HMAC', key, encoder.encode(rawBody));
+      const computedBody = Array.from(new Uint8Array(macBody)).map(b => b.toString(16).padStart(2, '0')).join('');
+      
+      const macSecret = await crypto.subtle.sign('HMAC', key, encoder.encode(secret));
+      const computedSecret = Array.from(new Uint8Array(macSecret)).map(b => b.toString(16).padStart(2, '0')).join('');
+
+      if (signatureHeader !== computedBody && signatureHeader !== computedSecret) {
+        console.error('Invalid Chapa signature');
+        return c.json({ error: 'Invalid signature' }, 401);
+      }
+    }
+
+    // Parse JSON body
+    let body: any = {};
+    if (rawBody) {
+      try { 
+        body = JSON.parse(rawBody); 
+      } catch { 
+        body = {}; 
+      }
+    }
+
+    // Normalize common fields
+    const event = body.event || body.type || body.event_type || undefined;
+    const data = body.data || body || {};
+    const statusRaw = data.status || body.status || data.payment_status || '';
+    const status = typeof statusRaw === 'string' ? statusRaw.toLowerCase() : '';
+
+    // Initialize Chapa webhook handler
+    const webhookHandler = new ChapaWebhookHandler(c.env.DB);
+
+    // Determine event type and handle accordingly
+    const isSuccessEvent = (
+      event === 'payment_success' ||
+      event === 'charge.success' ||
+      event === 'charge.completed' ||
+      ['success', 'paid', 'completed'].includes(status)
+    );
+
+    const isFailedEvent = (
+      event === 'payment_failed' ||
+      event === 'charge.failed' ||
+      event === 'charge.cancelled' ||
+      ['failed', 'cancelled', 'canceled', 'declined'].includes(status)
+    );
+
+    if (isSuccessEvent) {
+      await webhookHandler.handlePaymentSuccess({ event, data });
+    } else if (isFailedEvent) {
+      await webhookHandler.handlePaymentFailed({ event, data });
+    } else {
+      console.log('Chapa webhook received (unclassified):', { event, status, body });
+    }
+
+    return c.json({ received: true });
+  } catch (error) {
+    console.error('Chapa webhook error:', error);
+    return c.json({ error: 'Webhook error' }, 400);
+  }
+});
+
+/**
+ * Chapa callback endpoint (GET)
+ * Handles redirects from Chapa checkout with payment status
+ */
+app.get('/api/webhooks/chapa', async (c) => {
+  try {
+    const url = new URL(c.req.url);
+    const rawBody = '';
+
+    // Optional signature verification for GET callbacks
+    const secret = c.env.CHAPA_WEBHOOK_SECRET;
+    const signatureHeader = c.req.header('chapa-signature') || c.req.header('x-chapa-signature');
+    
+    if (secret && signatureHeader) {
+      const encoder = new TextEncoder();
+      const key = await crypto.subtle.importKey(
+        'raw',
+        encoder.encode(secret),
+        { name: 'HMAC', hash: 'SHA-256' },
+        false,
+        ['sign']
+      );
+
+      const macBody = await crypto.subtle.sign('HMAC', key, encoder.encode(rawBody));
+      const computedBody = Array.from(new Uint8Array(macBody)).map(b => b.toString(16).padStart(2, '0')).join('');
+      
+      const macSecret = await crypto.subtle.sign('HMAC', key, encoder.encode(secret));
+      const computedSecret = Array.from(new Uint8Array(macSecret)).map(b => b.toString(16).padStart(2, '0')).join('');
+
+      if (signatureHeader !== computedBody && signatureHeader !== computedSecret) {
+        console.error('Invalid Chapa signature (GET callback)');
+        return c.json({ error: 'Invalid signature' }, 400);
+      }
+    }
+
+    // Extract payment references from URL parameters
+    const txRef = url.searchParams.get('tx_ref') || url.searchParams.get('trx_ref') || url.searchParams.get('txRef') || url.searchParams.get('reference') || '';
+    const status = (url.searchParams.get('status') || '').toLowerCase();
+
+    if (!txRef) {
+      return c.json({ error: 'Missing tx_ref' }, 400);
+    }
+
+    // Verify with Chapa and update database
+    const chapaService = new ChapaService({
+      secretKey: c.env.CHAPA_SECRET_KEY,
+      publicKey: c.env.CHAPA_PUBLIC_KEY,
+      encryptionKey: c.env.CHAPA_ENCRYPTION_KEY,
+    });
+
+    const verification = await chapaService.verifyTransaction(txRef);
+
+    if (verification.status === 'success' && verification.data) {
+      // Update payment transaction status
+      await c.env.DB.prepare(`
+        UPDATE payment_transactions 
+        SET status = ?, updated_at = ?
+        WHERE tx_ref = ?
+      `).bind(
+        verification.data.status,
+        new Date().toISOString(),
+        txRef
+      ).run();
+
+      // If payment successful, update user subscription
+      if (verification.data.status === 'success') {
+        const transaction = await c.env.DB.prepare(`
+          SELECT user_id, plan_id, billing_cycle FROM payment_transactions 
+          WHERE tx_ref = ?
+        `).bind(txRef).first() as any;
+
+        if (transaction) {
+          const paidPlan = await getSubscriptionPlanById(c.env.DB, transaction.plan_id);
+          const newTier = paidPlan?.tier || 'pro';
+          
+          await c.env.DB.prepare(`
+            UPDATE users 
+            SET tier = ?, subscription_status = 'active', 
+                current_period_start = ?, current_period_end = ?
+            WHERE id = ?
+          `).bind(
+            newTier,
+            new Date().toISOString(),
+            new Date(Date.now() + (transaction.billing_cycle === 'yearly' ? 365 : 30) * 24 * 60 * 60 * 1000).toISOString(),
+            transaction.user_id
+          ).run();
+        }
+      }
+
+      return c.json({ received: true, status: verification.data.status, txRef });
+    } else {
+      return c.json({ error: 'Transaction verification failed', status }, 400);
+    }
+  } catch (error) {
+    console.error('Chapa callback handler error:', error);
+    return c.json({ error: 'Callback error' }, 400);
   }
 });
 
