@@ -28,6 +28,7 @@ interface Env {
   JWT_SECRET: string;
   RESEND_API_KEY: string;
   FRONTEND_URL: string;
+  BACKEND_URL?: string;
   FROM_EMAIL: string; // Optional, can be set to a verified domain email
   CHAPA_SECRET_KEY: string;
   CHAPA_PUBLIC_KEY: string;
@@ -2561,6 +2562,7 @@ app.post('/api/subscription/checkout', authMiddleware, async (c) => {
     const txRef = chapaService.generateTxRef(`PLAN_${plan.tier.toUpperCase()}`);
 
     // Create payment with Chapa
+    const backendOrigin = c.env.BACKEND_URL || new URL(c.req.url).origin;
     const payment = await chapaService.createPayment({
       amount: amountInETB,
       email: user.email,
@@ -2568,7 +2570,8 @@ app.post('/api/subscription/checkout', authMiddleware, async (c) => {
       lastName: user.name?.split(' ').slice(1).join(' ') || 'User',
       phoneNumber: phoneNumber,
       txRef: txRef,
-      callbackUrl: `${c.env.FRONTEND_URL}/api/webhooks/chapa`,
+      // Ensure callback posts to backend so we can capture ref_id from Chapa
+      callbackUrl: `${backendOrigin}/api/payment/callback`,
       returnUrl: `${c.env.FRONTEND_URL}/dashboard/subscription/receipt?tx_ref=${txRef}`,
       title: `${plan.name} Plan Subscription`,
       description: `${plan.name} plan subscription for ${billingCycle} billing cycle`,
@@ -2689,6 +2692,7 @@ app.post('/api/webhooks/chapa', async (c) => {
   try {
     // Read raw body for signature verification
     const rawBody = await c.req.text();
+    console.log('Chapa callback raw body (truncated):', rawBody?.slice(0, 800));
 
     // Verify webhook signature when secret is configured
     const secret = c.env.CHAPA_WEBHOOK_SECRET;
@@ -2769,6 +2773,173 @@ app.post('/api/webhooks/chapa', async (c) => {
   } catch (error) {
     console.error('Chapa webhook error:', error);
     return c.json({ error: 'Webhook error' }, 400);
+  }
+});
+
+/**
+ * Chapa callback_url endpoint (POST)
+ * This receives Chapa's POST to callback_url and persists ref_id linked to tx_ref
+ */
+app.post('/api/payment/callback', async (c) => {
+  try {
+    const rawBody = await c.req.text();
+
+    // Optional signature verification
+    const secret = c.env.CHAPA_WEBHOOK_SECRET;
+    const signatureHeader = c.req.header('chapa-signature') || c.req.header('x-chapa-signature');
+    let signatureValid = false;
+    if (secret) {
+      if (!signatureHeader) {
+        console.warn('Missing Chapa signature header on callback - proceeding non-strict');
+      }
+      const encoder = new TextEncoder();
+      const key = await crypto.subtle.importKey(
+        'raw',
+        encoder.encode(secret),
+        { name: 'HMAC', hash: 'SHA-256' },
+        false,
+        ['sign']
+      );
+      const macBody = await crypto.subtle.sign('HMAC', key, encoder.encode(rawBody));
+      const computedBody = Array.from(new Uint8Array(macBody)).map(b => b.toString(16).padStart(2, '0')).join('');
+      const macSecret = await crypto.subtle.sign('HMAC', key, encoder.encode(secret));
+      const computedSecret = Array.from(new Uint8Array(macSecret)).map(b => b.toString(16).padStart(2, '0')).join('');
+      signatureValid = signatureHeader === computedBody || signatureHeader === computedSecret;
+      if (!signatureValid) {
+        console.warn('Invalid Chapa signature on callback - proceeding non-strict');
+      }
+    }
+
+    let body: any = {};
+    const contentType = c.req.header('content-type') || '';
+    try {
+      if (rawBody && contentType.includes('application/json')) {
+        body = JSON.parse(rawBody);
+      } else if (rawBody && contentType.includes('application/x-www-form-urlencoded')) {
+        const params = new URLSearchParams(rawBody);
+        body = Object.fromEntries(params.entries());
+      } else {
+        body = rawBody ? JSON.parse(rawBody) : {};
+      }
+    } catch {
+      try {
+        const params = new URLSearchParams(rawBody || '');
+        body = Object.fromEntries(params.entries());
+      } catch {
+        body = {};
+      }
+    }
+
+    const data = body.data || body || {};
+    // tx_ref (ours) may appear as tx_ref or trx_ref only
+    const txRefRaw = data.tx_ref || data.trx_ref || body.tx_ref || body.trx_ref;
+    const txRef = typeof txRefRaw === 'string' ? txRefRaw.trim() : txRefRaw;
+    // Chapa's receipt/reference id
+    const refIdRaw = data.ref_id || data.reference || data.reference_id || data.ref || data.receipt_id || body.ref_id || body.reference || body.reference_id || body.ref || body.receipt_id;
+    const refId = typeof refIdRaw === 'string' ? refIdRaw.trim() : refIdRaw;
+    console.log('Chapa callback parsed refs:', { txRef, refId, status: data.status || body.status });
+    const statusRaw = data.status || body.status || '';
+    const status = typeof statusRaw === 'string' ? statusRaw.toLowerCase() : undefined;
+
+    if (!txRef) {
+      console.error('Callback missing tx_ref. Body:', body);
+      return c.json({ error: 'Missing tx_ref' }, 400);
+    }
+
+    // Persist ref_id if present and update status when provided
+    let savedRef = false;
+    if (refId) {
+      const updateRes = await c.env.DB.prepare(`
+        UPDATE payment_transactions
+        SET ref_id = ?, updated_at = ?
+        WHERE tx_ref = ?
+      `).bind(refId, new Date().toISOString(), txRef).run();
+      const verify = await c.env.DB.prepare(`
+        SELECT ref_id FROM payment_transactions WHERE tx_ref = ?
+      `).bind(txRef).first() as any;
+      savedRef = !!verify?.ref_id;
+      if (!savedRef) {
+        console.error('Failed to persist ref_id for tx_ref:', txRef, 'update result:', updateRes);
+      }
+    }
+
+    if (status) {
+      await c.env.DB.prepare(`
+        UPDATE payment_transactions
+        SET status = ?, updated_at = ?
+        WHERE tx_ref = ?
+      `).bind(status, new Date().toISOString(), txRef).run();
+    }
+
+    return c.json({ received: true, signatureValid, savedRef, txRef, refId, status });
+  } catch (error) {
+    console.error('Chapa callback_url handler error:', error);
+    return c.json({ error: 'Callback processing error' }, 400);
+  }
+});
+
+/**
+ * Query endpoint for polling ref_id by tx_ref
+ */
+app.get('/api/payment/ref/:txRef', async (c) => {
+  try {
+    const txRef = c.req.param('txRef');
+    const row = await c.env.DB.prepare(`
+      SELECT ref_id, status FROM payment_transactions WHERE tx_ref = ?
+    `).bind(txRef).first() as any;
+
+    if (!row) {
+      return c.json({ error: 'Not found' }, 404);
+    }
+
+    return c.json({ refId: row.ref_id || null, status: row.status || null });
+  } catch (error) {
+    console.error('Fetch ref_id error:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+/**
+ * Get current user's payment history
+ */
+app.get('/api/subscription/history', authMiddleware, async (c) => {
+  try {
+    const payload = c.get('jwtPayload');
+    const results = await c.env.DB.prepare(`
+      SELECT 
+        pt.tx_ref,
+        pt.ref_id,
+        pt.amount,
+        pt.currency,
+        pt.billing_cycle,
+        pt.status,
+        pt.created_at,
+        pt.updated_at,
+        sp.name AS plan_name,
+        sp.tier AS plan_tier
+      FROM payment_transactions pt
+      LEFT JOIN subscription_plans sp ON sp.id = pt.plan_id
+      WHERE pt.user_id = ?
+      ORDER BY pt.created_at DESC
+    `).bind(payload.userId).all();
+
+    const history = results.results.map((row: any) => ({
+      txRef: row.tx_ref,
+      refId: row.ref_id,
+      amount: row.amount,
+      currency: row.currency,
+      billingCycle: row.billing_cycle,
+      status: row.status,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+      planName: row.plan_name,
+      planTier: row.plan_tier,
+    }));
+
+    return c.json({ history });
+  } catch (error) {
+    console.error('Get subscription history error:', error);
+    return c.json({ error: 'Internal server error' }, 500);
   }
 });
 

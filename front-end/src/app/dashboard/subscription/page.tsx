@@ -306,6 +306,7 @@ export default function SubscriptionPage() {
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="plans">Plans & Pricing</TabsTrigger>
           <TabsTrigger value="usage">Usage</TabsTrigger>
+          <TabsTrigger value="history">History</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
@@ -609,6 +610,18 @@ export default function SubscriptionPage() {
             </Card>
           )}
         </TabsContent>
+
+        <TabsContent value="history" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Payment History</CardTitle>
+              <CardDescription>All your subscription payments and references</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <SubscriptionHistoryTable />
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
 
       {/* Phone Number Modal */}
@@ -653,6 +666,78 @@ export default function SubscriptionPage() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function SubscriptionHistoryTable() {
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [rows, setRows] = useState<Array<{
+    txRef: string;
+    refId: string | null;
+    amount: number;
+    currency: string;
+    billingCycle: 'monthly' | 'yearly';
+    status: string;
+    createdAt: string;
+    updatedAt: string;
+    planName: string;
+    planTier: 'free' | 'pro' | 'premium';
+  }>>([]);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const res = await subscriptionApi.getHistory();
+        setRows(res.history);
+      } catch (e) {
+        setError('Failed to load payment history');
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, []);
+
+  if (loading) {
+    return <div className="text-sm text-muted-foreground">Loading history...</div>;
+  }
+  if (error) {
+    return <div className="text-sm text-destructive">{error}</div>;
+  }
+  if (!rows.length) {
+    return <div className="text-sm text-muted-foreground">No payments yet.</div>;
+  }
+
+  return (
+    <div className="overflow-x-auto border rounded-md">
+      <table className="w-full text-sm">
+        <thead className="bg-muted/50">
+          <tr>
+            <th className="text-left p-3">Date</th>
+            <th className="text-left p-3">Plan</th>
+            <th className="text-left p-3">Amount</th>
+            <th className="text-left p-3">Billing</th>
+            <th className="text-left p-3">Status</th>
+            <th className="text-left p-3">tx_ref</th>
+            <th className="text-left p-3">ref_id</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={`${r.txRef}-${r.createdAt}`} className="border-t">
+              <td className="p-3">{new Date(r.createdAt).toLocaleString()}</td>
+              <td className="p-3">{r.planName || r.planTier}</td>
+              <td className="p-3">{r.amount} {r.currency}</td>
+              <td className="p-3 capitalize">{r.billingCycle}</td>
+              <td className="p-3 uppercase">{r.status}</td>
+              <td className="p-3 font-mono text-xs break-all">{r.txRef}</td>
+              <td className="p-3 font-mono text-xs break-all">{r.refId || '-'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }

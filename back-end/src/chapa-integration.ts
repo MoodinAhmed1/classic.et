@@ -125,7 +125,7 @@ export class ChapaService {
     }
   }
 
-  /**
+  /** 
    * Verify a transaction status
    * Checks the final status of a payment with Chapa
    */
@@ -201,8 +201,10 @@ export class ChapaWebhookHandler {
    */
   async handlePaymentSuccess(event: WebhookEvent): Promise<void> {
     const data = event?.data || {};
-    const txRef = data.tx_ref || data.reference || event.tx_ref || event.reference;
+    const txRef = data.tx_ref || data.trx_ref || event.tx_ref || event.reference;
+    const refId = data.ref_id || data.reference || data.reference_id || data.ref || data.receipt_id;
     const status = (data.status || event.status || 'success').toLowerCase();
+    console.log('Webhook success parsed refs:', { txRef, refId, status });
 
     if (!txRef) {
       console.error('Webhook success missing tx_ref', event);
@@ -215,9 +217,9 @@ export class ChapaWebhookHandler {
       // Mark payment as successful
       await this.db.prepare(`
         UPDATE payment_transactions 
-        SET status = ?, updated_at = ?
+        SET status = ?, ref_id = COALESCE(?, ref_id), updated_at = ?
         WHERE tx_ref = ?
-      `).bind(status, new Date().toISOString(), txRef).run();
+      `).bind(status, refId || null, new Date().toISOString(), txRef).run();
 
       // Load transaction to update user tier
       const transaction = await this.db.prepare(`

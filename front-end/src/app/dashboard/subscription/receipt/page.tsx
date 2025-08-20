@@ -6,12 +6,15 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { CheckCircle, Download, Home, ArrowRight } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { subscriptionApi } from '@/lib/api';
+import jsPDF from 'jspdf';
 
 interface TransactionData {
   plan: string;
   amount: number;
   reference: string;
   status: string;
+  currency?: string;
 }
 
 export default function ReceiptPage() {
@@ -31,19 +34,32 @@ export default function ReceiptPage() {
       return;
     }
 
-    // Verify the transaction
     verifyTransaction(txRef);
   }, [txRef]);
 
   const verifyTransaction = async (reference: string) => {
     try {
-      // Here you would typically verify the transaction with your backend
-      // For now, we'll simulate the verification
+      // Kick off server-side verification for tx_ref and capture amount/currency
+      const verify = await subscriptionApi.verifyTransaction(reference);
+
+      // Poll for ref_id saved by callback_url
+      const start = Date.now();
+      let refId: string | null = null;
+      let status: string | null = null;
+      while (Date.now() - start < 15000) { // up to 15s
+        const res = await subscriptionApi.getRefByTxRef(reference);
+        refId = res.refId;
+        status = res.status;
+        if (refId) break;
+        await new Promise(r => setTimeout(r, 1500));
+      }
+
       setTransactionData({
-        plan: 'Pro Plan',
-        amount: 9.99,
-        reference: reference,
-        status: 'Success'
+        plan: 'Subscription',
+        amount: Number((verify as any)?.amount ?? 0),
+        reference: refId || reference,
+        status: ((status as any) || verify?.status || 'processing').toString().toUpperCase(),
+        currency: (verify as any)?.currency || 'ETB'
       });
       setLoading(false);
     } catch (err) {
@@ -53,18 +69,71 @@ export default function ReceiptPage() {
   };
 
   const handleDownloadReceipt = () => {
-    if (txRef) {
-      // Create the Chapa receipt URL
-      const chapaReceiptUrl = `https://checkout.chapa.co/checkout/test-payment-receipt/${txRef}`;
-      
-      // Open the receipt in a new tab for download
-      window.open(chapaReceiptUrl, '_blank');
-      
-      toast({
-        title: "Receipt Download",
-        description: "Opening Chapa receipt in new tab",
-      });
+    const refId = transactionData?.reference || txRef || '';
+    if (!refId) {
+      toast({ title: 'Receipt', description: 'Missing reference id', variant: 'destructive' as any });
+      return;
     }
+
+    const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+    const pageWidth = doc.internal.pageSize.getWidth();
+
+    // Header
+    doc.setFillColor(34, 197, 94);
+    doc.rect(0, 0, pageWidth, 80, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(20);
+    doc.text('Payment Receipt', 40, 50);
+
+    // Company/brand name
+    doc.setFontSize(12);
+    doc.text('LinkShort', pageWidth - 120, 50);
+
+    // Body
+    doc.setTextColor(0, 0, 0);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(14);
+
+    let y = 120;
+    const line = (label: string, value: string) => {
+      doc.setFont('helvetica', 'bold');
+      doc.text(`${label}:`, 40, y);
+      doc.setFont('helvetica', 'normal');
+      doc.text(value, 180, y);
+      y += 26;
+    };
+
+    const dateStr = new Date().toLocaleString();
+    line('Reference (ref_id)', refId);
+    line('Status', transactionData?.status || '');
+    line('Amount', `${transactionData?.amount ?? ''} ${transactionData?.currency ?? ''}`.trim());
+    line('Plan', transactionData?.plan || 'Subscription');
+    line('Date', dateStr);
+
+    // Divider
+    doc.setDrawColor(220, 220, 220);
+    doc.line(40, y + 10, pageWidth - 40, y + 10);
+    y += 40;
+
+    // Signature block
+    doc.setFont('helvetica', 'bold');
+    doc.text('Authorized Signature', 40, y);
+    y += 50;
+    doc.setFont('times', 'italic');
+    doc.setFontSize(22);
+    doc.text('LinkShort', 40, y);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(12);
+    doc.text('Digitally signed by LinkShort', 40, y + 18);
+
+    // Footer
+    doc.setTextColor(120, 120, 120);
+    doc.setFontSize(10);
+    doc.text('Thank you for your purchase!', 40, 780);
+
+    doc.save(`receipt_${refId}.pdf`);
+    toast({ title: 'Receipt Download', description: 'PDF receipt generated' });
   };
 
   const handleGoHome = () => {
@@ -121,7 +190,7 @@ export default function ReceiptPage() {
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Amount:</span>
-                <span className="font-medium">${transactionData.amount}</span>
+                <span className="font-medium">{transactionData.amount} {transactionData.currency || ''}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Reference:</span>

@@ -337,6 +337,23 @@ export const subscriptionApi = {
     }>('/api/subscription/usage');
   },
 
+  getHistory: async () => {
+    return apiRequest<{
+      history: Array<{
+        txRef: string;
+        refId: string | null;
+        amount: number;
+        currency: string;
+        billingCycle: 'monthly' | 'yearly';
+        status: string;
+        createdAt: string;
+        updatedAt: string;
+        planName: string;
+        planTier: 'free' | 'pro' | 'premium';
+      }>;
+    }>(`/api/subscription/history`);
+  },
+
   // Chapa payment methods
   initializePayment: async (data: { planId: string; billingCycle: 'monthly' | 'yearly'; phoneNumber: string }) => {
     return apiRequest<{
@@ -357,6 +374,9 @@ export const subscriptionApi = {
       amount: number;
       currency: string;
     }>(`/api/subscription/verify/${txRef}`);
+  },
+  getRefByTxRef: async (txRef: string) => {
+    return apiRequest<{ refId: string | null; status: string | null }>(`/api/payment/ref/${txRef}`);
   },
 };
 
