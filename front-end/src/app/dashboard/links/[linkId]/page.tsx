@@ -33,7 +33,7 @@ interface AnalyticsData {
   clicksByDevice: { [key: string]: number };
   clicksByBrowser: { [key: string]: number };
   clicksByReferrer: { [key: string]: number };
-  clicksByCity?: { [key: string]: number };
+  
   clicksByReferrerPath?: { [key: string]: number };
   clicksByHour?: { [key: string]: number };
   totalClicks: number;
@@ -449,28 +449,7 @@ export default function LinkDetailsPage() {
                   </CardContent>
                 </Card>
 
-                {/* City (Premium) */}
-                {user?.tier === 'premium' && analytics.clicksByCity && Object.keys(analytics.clicksByCity).length > 0 && (
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Top Cities</CardTitle>
-                      <CardDescription>City-level clicks</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-2">
-                        {Object.entries(analytics.clicksByCity)
-                          .sort(([,a], [,b]) => b - a)
-                          .slice(0, 10)
-                          .map(([city, clicks]) => (
-                            <div key={city} className="flex items-center justify-between py-2">
-                              <span className="text-sm">{city || 'Unknown'}</span>
-                              <span className="text-sm font-medium">{clicks}</span>
-                            </div>
-                          ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
+
 
                 {/* Devices */}
                 <Card>

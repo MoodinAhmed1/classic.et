@@ -503,13 +503,7 @@ export default function SubscriptionPage() {
                         info: 'Visualize your data with charts and graphs for better insights.',
                         upsell: 'Available on the Premium plan.'
                       },
-                      {
-                        key: 'city_analytics',
-                        label: 'City-level analytics',
-                        available: plan.tier === 'premium',
-                        info: 'See detailed geographic data including city-level visitor information.',
-                        upsell: 'Available on the Premium plan.'
-                      },
+
                       {
                         key: 'hourly_breakdown',
                         label: 'Hourly time breakdown',

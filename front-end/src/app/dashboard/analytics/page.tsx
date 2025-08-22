@@ -35,7 +35,7 @@ interface GlobalAnalytics {
   clicksByCountry: { [key: string]: number };
   clicksByDevice: { [key: string]: number };
   clicksByBrowser: { [key: string]: number };
-  clicksByCity?: { [key: string]: number };
+  
   clicksByReferrerPath?: { [key: string]: number };
   clicksByHour?: { [key: string]: number };
   totalClicks: number;
@@ -248,32 +248,7 @@ export default function AnalyticsPage() {
         </div>
         ` : ''}
 
-        ${analytics.clicksByCity && Object.keys(analytics.clicksByCity).length > 0 ? `
-        <div style="margin-bottom: 30px;">
-          <h2 style="color: #374151; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px;">Top Cities</h2>
-          <table style="width: 100%; border-collapse: collapse; margin-top: 20px;">
-            <thead>
-              <tr style="background: #f8fafc;">
-                <th style="padding: 12px; text-align: left; border-bottom: 1px solid #e5e7eb;">City</th>
-                <th style="padding: 12px; text-align: right; border-bottom: 1px solid #e5e7eb;">Clicks</th>
-                <th style="padding: 12px; text-align: right; border-bottom: 1px solid #e5e7eb;">Percentage</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${Object.entries(analytics.clicksByCity || {})
-                .sort(([,a], [,b]) => b - a)
-                .slice(0, 15)
-                .map(([city, clicks]) => `
-                  <tr>
-                    <td style="padding: 12px; border-bottom: 1px solid #f3f4f6;">${city || 'Unknown'}</td>
-                    <td style="padding: 12px; border-bottom: 1px solid #f3f4f6; text-align: right;">${clicks}</td>
-                    <td style="padding: 12px; border-bottom: 1px solid #f3f4f6; text-align: right;">${analytics.totalClicks > 0 ? Math.round((clicks / analytics.totalClicks) * 100) : 0}%</td>
-                  </tr>
-                `).join('')}
-            </tbody>
-          </table>
-        </div>
-        ` : ''}
+
 
         ${Object.keys(analytics.clicksByDevice).length > 0 ? `
         <div style="margin-bottom: 30px;">
@@ -747,41 +722,7 @@ export default function AnalyticsPage() {
               </CardContent>
             </Card>
 
-            {/* Top Cities - Premium Only */}
-            {user?.tier === 'premium' && analytics.clicksByCity && Object.keys(analytics.clicksByCity).length > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Top Cities</CardTitle>
-                  <CardDescription>City-level visitor distribution</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    {Object.entries(analytics.clicksByCity)
-                      .sort(([,a], [,b]) => b - a)
-                      .slice(0, 10)
-                      .map(([city, clicks]) => (
-                        <div key={city} className="flex items-center justify-between">
-                          <div className="flex items-center space-x-2">
-                            <Globe className="h-4 w-4 text-muted-foreground" />
-                            <span className="text-sm">{city || 'Unknown'}</span>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <div className="w-20 bg-gray-200 rounded-full h-2">
-                              <div 
-                                className="bg-green-600 h-2 rounded-full" 
-                                style={{ 
-                                        width: `${analytics.totalClicks > 0 ? (clicks / analytics.totalClicks) * 100 : 0}%` 
-                                }}
-                              ></div>
-                            </div>
-                            <span className="text-sm font-medium w-8 text-right">{clicks}</span>
-                          </div>
-                        </div>
-                      ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
+
 
             {/* Device Types */}
             <Card>
@@ -940,31 +881,6 @@ export default function AnalyticsPage() {
             </div>
           ) : (
           <div className="grid gap-6 grid-cols-1 md:grid-cols-2">
-            {/* Top Cities - Premium Only */}
-            {user?.tier === 'premium' && analytics.clicksByCity && Object.keys(analytics.clicksByCity).length > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Top Cities</CardTitle>
-                  <CardDescription>City-level visitor distribution</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    {Object.entries(analytics.clicksByCity)
-                      .sort(([,a], [,b]) => b - a)
-                      .slice(0, 10)
-                      .map(([city, clicks]) => (
-                        <div key={city} className="flex justify-between text-sm">
-                          <span>{city || 'Unknown'}</span>
-                          <span className="font-medium">
-                              {analytics.totalClicks > 0 ? Math.round((clicks / analytics.totalClicks) * 100) : 0}%
-                          </span>
-                        </div>
-                      ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
             {/* Top Countries */}
             <Card>
               <CardHeader>
@@ -1112,31 +1028,6 @@ export default function AnalyticsPage() {
             </div>
           ) : (
           <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-            {/* Top Cities - Premium Only */}
-            {user?.tier === 'premium' && analytics.clicksByCity && Object.keys(analytics.clicksByCity).length > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Top Cities</CardTitle>
-                  <CardDescription>City-level visitor distribution</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    {Object.entries(analytics.clicksByCity)
-                      .sort(([,a], [,b]) => b - a)
-                      .slice(0, 10)
-                      .map(([city, clicks]) => (
-                        <div key={city} className="flex justify-between text-sm">
-                          <span>{city || 'Unknown'}</span>
-                          <span className="font-medium">
-                              {analytics.totalClicks > 0 ? Math.round((clicks / analytics.totalClicks) * 100) : 0}%
-                          </span>
-                        </div>
-                      ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
             <Card>
               <CardHeader>
                 <CardTitle>Geographic Distribution</CardTitle>

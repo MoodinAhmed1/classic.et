@@ -40,7 +40,6 @@ export interface AnalyticsEvent {
   user_agent: string | null;
   referer: string | null;
   country: string | null;
-  city: string | null;
 }
 
 // Database operations
@@ -142,8 +141,8 @@ export class DatabaseService {
     const now = new Date().toISOString();
     await this.db
       .prepare(`
-        INSERT INTO analytics_events (id, link_id, timestamp, ip_address, user_agent, referer, country, city)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO analytics_events (id, link_id, timestamp, ip_address, user_agent, referer, country)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
       `)
       .bind(
         event.id,
@@ -152,8 +151,7 @@ export class DatabaseService {
         event.ip_address,
         event.user_agent,
         event.referer,
-        event.country,
-        event.city
+        event.country
       )
       .run();
   }

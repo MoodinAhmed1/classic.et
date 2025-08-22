@@ -2207,14 +2207,13 @@ app.get('/api/links/:id/analytics', authMiddleware, async (c) => {
         DATE(timestamp) as date,
         COUNT(*) as clicks,
         country,
-        city,
         device_type,
         browser,
         referer
       FROM analytics_events 
       WHERE link_id = ? AND timestamp >= ?
       AND timestamp >= datetime('now', '-${plan?.limits.analytics_retention_days || 7} days')
-      GROUP BY DATE(timestamp), country, city, device_type, browser, referer
+      GROUP BY DATE(timestamp), country, device_type, browser, referer
       ORDER BY timestamp DESC
     `).bind(linkId, startDate.toISOString()).all();
 
@@ -2224,7 +2223,6 @@ app.get('/api/links/:id/analytics', authMiddleware, async (c) => {
     const clicksByDevice: { [key: string]: number } = {};
     const clicksByBrowser: { [key: string]: number } = {};
     const clicksByReferrer: { [key: string]: number } = {};
-    const clicksByCity: { [key: string]: number } = {};
     const clicksByReferrerPath: { [key: string]: number } = {};
 
     analytics.results.forEach((row: any) => {
@@ -2233,7 +2231,6 @@ app.get('/api/links/:id/analytics', authMiddleware, async (c) => {
       if (row.device_type) clicksByDevice[row.device_type] = (clicksByDevice[row.device_type] || 0) + row.clicks;
       if (row.browser) clicksByBrowser[row.browser] = (clicksByBrowser[row.browser] || 0) + row.clicks;
       if (row.referer) clicksByReferrer[row.referer] = (clicksByReferrer[row.referer] || 0) + row.clicks;
-      if (row.city) clicksByCity[row.city] = (clicksByCity[row.city] || 0) + row.clicks;
       if (row.referer) {
         try {
           const u = new URL(row.referer);
@@ -2291,7 +2288,7 @@ app.get('/api/links/:id/analytics', authMiddleware, async (c) => {
       clicksByDevice: restrictedDevices,
       clicksByBrowser: restrictedBrowsers,
       clicksByReferrer,
-      clicksByCity: canSeeAdvanced ? clicksByCity : {},
+
       clicksByReferrerPath: canSeeAdvanced ? clicksByReferrerPath : {},
       clicksByHour: canSeeAdvanced ? clicksByHour : {},
       totalClicks: Object.values(clicksByDate).reduce((sum, clicks) => sum + clicks, 0),
@@ -2345,14 +2342,13 @@ app.get('/:shortCode', async (c) => {
     const referer = c.req.header('referer') || '';
     const ip = c.req.header('cf-connecting-ip') || '';
     const country = c.req.header('cf-ipcountry') || '';
-    const city = c.req.header('cf-ipcity') || '';
 
     const { device_type, browser, os } = parseUserAgent(userAgent);
 
     // Create analytics event
     await c.env.DB.prepare(`
-      INSERT INTO analytics_events (id, link_id, ip_address, user_agent, referer, country, city, device_type, browser, os)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO analytics_events (id, link_id, ip_address, user_agent, referer, country, device_type, browser, os)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       generateId(),
       link.id,
@@ -2360,7 +2356,6 @@ app.get('/:shortCode', async (c) => {
       userAgent,
       referer,
       country,
-      city,
       device_type,
       browser,
       os
@@ -2419,7 +2414,6 @@ app.get('/api/analytics/global', authMiddleware, async (c) => {
         DATE(timestamp) as date,
         COUNT(*) as clicks,
         country,
-        city,
         device_type,
         browser,
         link_id,
@@ -2428,7 +2422,7 @@ app.get('/api/analytics/global', authMiddleware, async (c) => {
       WHERE link_id IN (${links.results.map(() => '?').join(',')}) 
       AND timestamp >= ?
       AND timestamp >= datetime('now', '-${plan?.limits.analytics_retention_days || 7} days')
-      GROUP BY DATE(timestamp), country, city, device_type, browser, link_id, referer
+      GROUP BY DATE(timestamp), country, device_type, browser, link_id, referer
       ORDER BY timestamp DESC
     `).bind(...links.results.map((l: any) => l.id), startDate.toISOString()).all();
 
@@ -2438,7 +2432,6 @@ app.get('/api/analytics/global', authMiddleware, async (c) => {
     const clicksByDevice: { [key: string]: number } = {};
     const clicksByBrowser: { [key: string]: number } = {};
     const clicksByLink: { [key: string]: number } = {};
-    const clicksByCity: { [key: string]: number } = {};
     const clicksByReferrerPath: { [key: string]: number } = {};
 
     analytics.results.forEach((row: any) => {
@@ -2447,7 +2440,6 @@ app.get('/api/analytics/global', authMiddleware, async (c) => {
       if (row.device_type) clicksByDevice[row.device_type] = (clicksByDevice[row.device_type] || 0) + row.clicks;
       if (row.browser) clicksByBrowser[row.browser] = (clicksByBrowser[row.browser] || 0) + row.clicks;
       if (row.link_id) clicksByLink[row.link_id] = (clicksByLink[row.link_id] || 0) + row.clicks;
-      if (row.city) clicksByCity[row.city] = (clicksByCity[row.city] || 0) + row.clicks;
       if (row.referer) {
         try {
           const u = new URL(row.referer);
@@ -2506,7 +2498,7 @@ app.get('/api/analytics/global', authMiddleware, async (c) => {
       clicksByCountry: restrictedCountries,
       clicksByDevice: restrictedDevices,
       clicksByBrowser: restrictedBrowsers,
-      clicksByCity: canSeeAdvanced ? clicksByCity : {},
+
       clicksByReferrerPath: canSeeAdvanced ? clicksByReferrerPath : {},
       clicksByHour: canSeeAdvanced ? clicksByHour : {},
       totalClicks: Object.values(clicksByDate).reduce((sum, clicks) => sum + clicks, 0),
