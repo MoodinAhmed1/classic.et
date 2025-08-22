@@ -26,6 +26,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/auth-context';
 import { subscriptionApi } from '@/lib/api';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface SubscriptionPlan {
   id: string;
@@ -482,10 +483,78 @@ export default function SubscriptionPage() {
                 
                 <CardContent className="space-y-4">
                   <div className="space-y-3">
-                    {plan.features.map((feature, index) => (
-                      <div key={index} className="flex items-center gap-2">
-                        <Check className="h-4 w-4 text-green-500" />
-                        <span className="text-sm">{feature}</span>
+                    {[
+                      {
+                        key: 'basic_links',
+                        label: 'Basic link shortening',
+                        available: true,
+                        info: 'Create and manage shortened URLs for easy sharing.'
+                      },
+                      {
+                        key: 'analytics',
+                        label: 'Basic analytics',
+                        available: true,
+                        info: 'Track clicks and basic visitor information.'
+                      },
+                      {
+                        key: 'graphical_analytics',
+                        label: 'Graphical analytics',
+                        available: plan.tier === 'premium',
+                        info: 'Visualize your data with charts and graphs for better insights.',
+                        upsell: 'Available on the Premium plan.'
+                      },
+                      {
+                        key: 'city_analytics',
+                        label: 'City-level analytics',
+                        available: plan.tier === 'premium',
+                        info: 'See detailed geographic data including city-level visitor information.',
+                        upsell: 'Available on the Premium plan.'
+                      },
+                      {
+                        key: 'hourly_breakdown',
+                        label: 'Hourly time breakdown',
+                        available: plan.tier === 'premium',
+                        info: 'Analyze visitor patterns by hour to optimize your content timing.',
+                        upsell: 'Available on the Premium plan.'
+                      },
+                      {
+                        key: 'custom_short_codes',
+                        label: 'Custom short codes',
+                        available: plan.tier === 'pro' || plan.tier === 'premium',
+                        info: 'Create memorable, branded short codes for your links.',
+                        upsell: 'Available on Pro and Premium plans.'
+                      },
+                      {
+                        key: 'advanced_retention',
+                        label: 'Extended analytics retention',
+                        available: plan.tier === 'pro' || plan.tier === 'premium',
+                        info: 'Keep your analytics data for longer periods.',
+                        upsell: 'Available on Pro and Premium plans.'
+                      },
+                      {
+                        key: 'qr_codes',
+                        label: 'QR code generation',
+                        available: plan.tier === 'pro' || plan.tier === 'premium',
+                        info: 'Generate QR codes for your shortened links for easy sharing.',
+                        upsell: 'Available on Pro and Premium plans.'
+                      }
+                    ].map((feature) => (
+                      <div key={feature.key} className="flex items-center gap-2">
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div className="flex items-center gap-2 cursor-help">
+                                {feature.available ? '✅' : '❌'}
+                                <span className={`text-sm ${feature.available ? '' : 'text-gray-400'}`}>
+                                  {feature.label}
+                                </span>
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p className="max-w-xs">{feature.info} {feature.upsell || ''}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
                       </div>
                     ))}
                   </div>

@@ -198,6 +198,7 @@ export const linksApi = {
     title?: string;
     isActive?: boolean;
     expiresAt?: string | null;
+    shortCode?: string;
   }) => {
     return apiRequest<{ success: boolean }>(`/api/links/${id}`, {
       method: 'PUT',
@@ -218,6 +219,9 @@ export const linksApi = {
       clicksByDevice: { [key: string]: number };
       clicksByBrowser: { [key: string]: number };
       clicksByReferrer: { [key: string]: number };
+      clicksByCity?: { [key: string]: number };
+      clicksByReferrerPath?: { [key: string]: number };
+      clicksByHour?: { [key: string]: number };
       totalClicks: number;
     }>(`/api/links/${id}/analytics?days=${days}`);
   },
@@ -225,7 +229,7 @@ export const linksApi = {
 
 // Global Analytics API
 export const globalAnalyticsApi = {
-  getGlobalAnalytics: async (days = 30) => {
+  getGlobalAnalytics: async (days: number) => {
     return apiRequest<{
       links: Array<{
         id: string;
@@ -239,6 +243,9 @@ export const globalAnalyticsApi = {
       clicksByCountry: { [key: string]: number };
       clicksByDevice: { [key: string]: number };
       clicksByBrowser: { [key: string]: number };
+      clicksByCity?: { [key: string]: number };
+      clicksByReferrerPath?: { [key: string]: number };
+      clicksByHour?: { [key: string]: number };
       totalClicks: number;
       restrictions: {
         canSeeFullAnalytics: boolean;

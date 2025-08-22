@@ -58,3 +58,78 @@ export async function fetchPageTitle(url: string): Promise<string | null> {
     return null;
   }
 }
+
+// Country code to full country name mapping (ISO Alpha-2)
+const COUNTRY_CODE_TO_NAME: Record<string, string> = {
+  US: 'United States',
+  DE: 'Germany',
+  GB: 'United Kingdom',
+  CA: 'Canada',
+  FR: 'France',
+  ES: 'Spain',
+  IT: 'Italy',
+  BR: 'Brazil',
+  IN: 'India',
+  CN: 'China',
+  JP: 'Japan',
+  AU: 'Australia',
+  NL: 'Netherlands',
+  SE: 'Sweden',
+  NO: 'Norway',
+  DK: 'Denmark',
+  FI: 'Finland',
+  RU: 'Russia',
+  MX: 'Mexico',
+  ZA: 'South Africa',
+  NG: 'Nigeria',
+  KE: 'Kenya',
+  ET: 'Ethiopia',
+  SA: 'Saudi Arabia',
+  AE: 'United Arab Emirates',
+  TR: 'Turkey',
+  AR: 'Argentina',
+  CL: 'Chile',
+  CO: 'Colombia',
+  KR: 'South Korea',
+  ID: 'Indonesia',
+  TH: 'Thailand',
+  MY: 'Malaysia',
+  SG: 'Singapore',
+  PH: 'Philippines',
+  VN: 'Vietnam',
+  PL: 'Poland',
+  CZ: 'Czechia',
+  AT: 'Austria',
+  CH: 'Switzerland',
+  BE: 'Belgium',
+  PT: 'Portugal',
+  IE: 'Ireland',
+  RO: 'Romania',
+  HU: 'Hungary',
+  GR: 'Greece',
+  UA: 'Ukraine',
+  BG: 'Bulgaria',
+  SK: 'Slovakia',
+  SI: 'Slovenia',
+  HR: 'Croatia',
+  RS: 'Serbia',
+  IL: 'Israel',
+  PK: 'Pakistan',
+  BD: 'Bangladesh',
+  LK: 'Sri Lanka',
+  NZ: 'New Zealand',
+  MA: 'Morocco',
+  TN: 'Tunisia',
+  EG: 'Egypt',
+  GH: 'Ghana',
+  ET: 'Ethiopia',
+  TZ: 'Tanzania',
+  UG: 'Uganda',
+  // Fallback coverage for common codes; others will show code
+};
+
+export function countryCodeToName(code: string): string {
+  if (!code) return 'Unknown';
+  const upper = code.toUpperCase();
+  return COUNTRY_CODE_TO_NAME[upper] || upper;
+}

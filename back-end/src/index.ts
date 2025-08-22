@@ -2100,16 +2100,42 @@ app.put('/api/links/:id', authMiddleware, async (c) => {
   try {
     const payload = c.get('jwtPayload');
     const linkId = c.req.param('id');
-    const { title, isActive, expiresAt } = await c.req.json();
+    const { title, isActive, expiresAt, shortCode } = await c.req.json();
+
+    // If shortCode is provided, require Premium and ensure uniqueness
+    if (typeof shortCode === 'string' && shortCode.trim().length > 0) {
+      const user = await c.env.DB.prepare(
+        'SELECT tier FROM users WHERE id = ?'
+      ).bind(payload.userId).first() as { tier: string } | null;
+      if (!user) {
+        return c.json({ error: 'User not found' }, 404);
+      }
+      if (user.tier !== 'premium') {
+        return c.json({ error: 'Custom short codes require Premium plan' }, 403);
+      }
+
+      // Uniqueness: short code must not exist on any other link
+      const existing = await c.env.DB.prepare(
+        'SELECT id FROM links WHERE short_code = ? AND id <> ?'
+      ).bind(shortCode.trim(), linkId).first();
+      if (existing) {
+        return c.json({ error: 'Short code already in use' }, 409);
+      }
+    }
 
     const result = await c.env.DB.prepare(`
       UPDATE links 
-      SET title = ?, is_active = ?, expires_at = ?, updated_at = ?
+      SET title = ?,
+          is_active = ?,
+          expires_at = ?,
+          short_code = COALESCE(?, short_code),
+          updated_at = ?
       WHERE id = ? AND user_id = ?
     `).bind(
       title,
       isActive,
       expiresAt || null,
+      (typeof shortCode === 'string' && shortCode.trim().length > 0) ? shortCode.trim() : null,
       new Date().toISOString(),
       linkId,
       payload.userId
@@ -2181,13 +2207,14 @@ app.get('/api/links/:id/analytics', authMiddleware, async (c) => {
         DATE(timestamp) as date,
         COUNT(*) as clicks,
         country,
+        city,
         device_type,
         browser,
         referer
       FROM analytics_events 
       WHERE link_id = ? AND timestamp >= ?
       AND timestamp >= datetime('now', '-${plan?.limits.analytics_retention_days || 7} days')
-      GROUP BY DATE(timestamp), country, device_type, browser, referer
+      GROUP BY DATE(timestamp), country, city, device_type, browser, referer
       ORDER BY timestamp DESC
     `).bind(linkId, startDate.toISOString()).all();
 
@@ -2197,6 +2224,8 @@ app.get('/api/links/:id/analytics', authMiddleware, async (c) => {
     const clicksByDevice: { [key: string]: number } = {};
     const clicksByBrowser: { [key: string]: number } = {};
     const clicksByReferrer: { [key: string]: number } = {};
+    const clicksByCity: { [key: string]: number } = {};
+    const clicksByReferrerPath: { [key: string]: number } = {};
 
     analytics.results.forEach((row: any) => {
       clicksByDate[row.date] = (clicksByDate[row.date] || 0) + row.clicks;
@@ -2204,7 +2233,34 @@ app.get('/api/links/:id/analytics', authMiddleware, async (c) => {
       if (row.device_type) clicksByDevice[row.device_type] = (clicksByDevice[row.device_type] || 0) + row.clicks;
       if (row.browser) clicksByBrowser[row.browser] = (clicksByBrowser[row.browser] || 0) + row.clicks;
       if (row.referer) clicksByReferrer[row.referer] = (clicksByReferrer[row.referer] || 0) + row.clicks;
+      if (row.city) clicksByCity[row.city] = (clicksByCity[row.city] || 0) + row.clicks;
+      if (row.referer) {
+        try {
+          const u = new URL(row.referer);
+          const path = `${u.hostname}${u.pathname}`;
+          clicksByReferrerPath[path] = (clicksByReferrerPath[path] || 0) + row.clicks;
+        } catch {
+          // ignore invalid URL
+        }
+      }
     });
+
+    // Hourly breakdown for premium (advanced charts)
+    let clicksByHour: { [key: string]: number } = {};
+    const canSeeAdvancedHourly = await canSeeAdvancedCharts(c.env.DB, payload.userId);
+    if (canSeeAdvancedHourly) {
+      const hourly = await c.env.DB.prepare(`
+        SELECT strftime('%Y-%m-%d %H:00', timestamp) as hour, COUNT(*) as clicks
+        FROM analytics_events
+        WHERE link_id = ? AND timestamp >= ?
+        AND timestamp >= datetime('now', '-${plan?.limits.analytics_retention_days || 7} days')
+        GROUP BY hour
+        ORDER BY hour ASC
+      `).bind(linkId, startDate.toISOString()).all();
+      hourly.results.forEach((row: any) => {
+        clicksByHour[row.hour] = row.clicks;
+      });
+    }
 
     // Check user's analytics permissions
     const canSeeFull = await canSeeFullAnalytics(c.env.DB, payload.userId);
@@ -2235,6 +2291,9 @@ app.get('/api/links/:id/analytics', authMiddleware, async (c) => {
       clicksByDevice: restrictedDevices,
       clicksByBrowser: restrictedBrowsers,
       clicksByReferrer,
+      clicksByCity: canSeeAdvanced ? clicksByCity : {},
+      clicksByReferrerPath: canSeeAdvanced ? clicksByReferrerPath : {},
+      clicksByHour: canSeeAdvanced ? clicksByHour : {},
       totalClicks: Object.values(clicksByDate).reduce((sum, clicks) => sum + clicks, 0),
       restrictions: {
         canSeeFullAnalytics: canSeeFull,
@@ -2360,14 +2419,16 @@ app.get('/api/analytics/global', authMiddleware, async (c) => {
         DATE(timestamp) as date,
         COUNT(*) as clicks,
         country,
+        city,
         device_type,
         browser,
-        link_id
+        link_id,
+        referer
       FROM analytics_events 
       WHERE link_id IN (${links.results.map(() => '?').join(',')}) 
       AND timestamp >= ?
       AND timestamp >= datetime('now', '-${plan?.limits.analytics_retention_days || 7} days')
-      GROUP BY DATE(timestamp), country, device_type, browser, link_id
+      GROUP BY DATE(timestamp), country, city, device_type, browser, link_id, referer
       ORDER BY timestamp DESC
     `).bind(...links.results.map((l: any) => l.id), startDate.toISOString()).all();
 
@@ -2377,6 +2438,8 @@ app.get('/api/analytics/global', authMiddleware, async (c) => {
     const clicksByDevice: { [key: string]: number } = {};
     const clicksByBrowser: { [key: string]: number } = {};
     const clicksByLink: { [key: string]: number } = {};
+    const clicksByCity: { [key: string]: number } = {};
+    const clicksByReferrerPath: { [key: string]: number } = {};
 
     analytics.results.forEach((row: any) => {
       clicksByDate[row.date] = (clicksByDate[row.date] || 0) + row.clicks;
@@ -2384,6 +2447,14 @@ app.get('/api/analytics/global', authMiddleware, async (c) => {
       if (row.device_type) clicksByDevice[row.device_type] = (clicksByDevice[row.device_type] || 0) + row.clicks;
       if (row.browser) clicksByBrowser[row.browser] = (clicksByBrowser[row.browser] || 0) + row.clicks;
       if (row.link_id) clicksByLink[row.link_id] = (clicksByLink[row.link_id] || 0) + row.clicks;
+      if (row.city) clicksByCity[row.city] = (clicksByCity[row.city] || 0) + row.clicks;
+      if (row.referer) {
+        try {
+          const u = new URL(row.referer);
+          const path = `${u.hostname}${u.pathname}`;
+          clicksByReferrerPath[path] = (clicksByReferrerPath[path] || 0) + row.clicks;
+        } catch {}
+      }
     });
 
     // Apply restrictions based on user tier
@@ -2408,6 +2479,20 @@ app.get('/api/analytics/global', authMiddleware, async (c) => {
     // Get usage summary for visitor caps
     const usageSummary = await getUserUsageSummary(c.env.DB, payload.userId);
 
+    // Hourly breakdown for premium
+    let clicksByHour: { [key: string]: number } = {};
+    if (canSeeAdvanced) {
+      const hourly = await c.env.DB.prepare(`
+        SELECT strftime('%Y-%m-%d %H:00', timestamp) as hour, COUNT(*) as clicks
+        FROM analytics_events
+        WHERE link_id IN (${links.results.map(() => '?').join(',')}) AND timestamp >= ?
+        AND timestamp >= datetime('now', '-${plan?.limits.analytics_retention_days || 7} days')
+        GROUP BY hour
+        ORDER BY hour ASC
+      `).bind(...links.results.map((l: any) => l.id), startDate.toISOString()).all();
+      hourly.results.forEach((row: any) => { clicksByHour[row.hour] = row.clicks; });
+    }
+
     return c.json({
       links: links.results.map((link: any) => ({
         id: link.id,
@@ -2421,6 +2506,9 @@ app.get('/api/analytics/global', authMiddleware, async (c) => {
       clicksByCountry: restrictedCountries,
       clicksByDevice: restrictedDevices,
       clicksByBrowser: restrictedBrowsers,
+      clicksByCity: canSeeAdvanced ? clicksByCity : {},
+      clicksByReferrerPath: canSeeAdvanced ? clicksByReferrerPath : {},
+      clicksByHour: canSeeAdvanced ? clicksByHour : {},
       totalClicks: Object.values(clicksByDate).reduce((sum, clicks) => sum + clicks, 0),
       restrictions: {
         canSeeFullAnalytics: canSeeFull,

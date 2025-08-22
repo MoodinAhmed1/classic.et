@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { BarChart3, TrendingUp, Globe, Monitor, Smartphone, Tablet, Calendar, Download, RefreshCw, Loader2, Lock, ArrowUpRight } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { globalAnalyticsApi } from '@/lib/api';
+import { countryCodeToName } from '@/lib/utils';
 import { useAuth } from '@/contexts/auth-context';
 import Link from 'next/link';
 import { 
@@ -34,6 +35,9 @@ interface GlobalAnalytics {
   clicksByCountry: { [key: string]: number };
   clicksByDevice: { [key: string]: number };
   clicksByBrowser: { [key: string]: number };
+  clicksByCity?: { [key: string]: number };
+  clicksByReferrerPath?: { [key: string]: number };
+  clicksByHour?: { [key: string]: number };
   totalClicks: number;
   restrictions: {
     canSeeFullAnalytics: boolean;
@@ -54,6 +58,7 @@ export default function AnalyticsPage() {
   const [timeRange, setTimeRange] = useState('30');
   const { user } = useAuth();
   const { toast } = useToast();
+  const [analyticsViewMode, setAnalyticsViewMode] = useState<'graphical' | 'standard'>('graphical');
 
   useEffect(() => {
     fetchAnalytics();
@@ -117,7 +122,7 @@ export default function AnalyticsPage() {
     const clicksByCountry = Object.entries(analytics.clicksByCountry || {})
       .sort(([,a], [,b]) => b - a)
       .slice(0, 10)
-      .map(([country, clicks]) => ({ country, clicks }));
+      .map(([country, clicks]) => ({ country: countryCodeToName(country), clicks }));
 
     const clicksByDevice = Object.entries(analytics.clicksByDevice || {})
       .sort(([,a], [,b]) => b - a)
@@ -233,7 +238,34 @@ export default function AnalyticsPage() {
                 .slice(0, 15)
                 .map(([country, clicks]) => `
                   <tr>
-                    <td style="padding: 12px; border-bottom: 1px solid #f3f4f6;">${country}</td>
+                    <td style="padding: 12px; border-bottom: 1px solid #f3f4f6;">${countryCodeToName(country)}</td>
+                    <td style="padding: 12px; border-bottom: 1px solid #f3f4f6; text-align: right;">${clicks}</td>
+                    <td style="padding: 12px; border-bottom: 1px solid #f3f4f6; text-align: right;">${analytics.totalClicks > 0 ? Math.round((clicks / analytics.totalClicks) * 100) : 0}%</td>
+                  </tr>
+                `).join('')}
+            </tbody>
+          </table>
+        </div>
+        ` : ''}
+
+        ${analytics.clicksByCity && Object.keys(analytics.clicksByCity).length > 0 ? `
+        <div style="margin-bottom: 30px;">
+          <h2 style="color: #374151; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px;">Top Cities</h2>
+          <table style="width: 100%; border-collapse: collapse; margin-top: 20px;">
+            <thead>
+              <tr style="background: #f8fafc;">
+                <th style="padding: 12px; text-align: left; border-bottom: 1px solid #e5e7eb;">City</th>
+                <th style="padding: 12px; text-align: right; border-bottom: 1px solid #e5e7eb;">Clicks</th>
+                <th style="padding: 12px; text-align: right; border-bottom: 1px solid #e5e7eb;">Percentage</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${Object.entries(analytics.clicksByCity || {})
+                .sort(([,a], [,b]) => b - a)
+                .slice(0, 15)
+                .map(([city, clicks]) => `
+                  <tr>
+                    <td style="padding: 12px; border-bottom: 1px solid #f3f4f6;">${city || 'Unknown'}</td>
                     <td style="padding: 12px; border-bottom: 1px solid #f3f4f6; text-align: right;">${clicks}</td>
                     <td style="padding: 12px; border-bottom: 1px solid #f3f4f6; text-align: right;">${analytics.totalClicks > 0 ? Math.round((clicks / analytics.totalClicks) * 100) : 0}%</td>
                   </tr>
@@ -414,6 +446,49 @@ export default function AnalyticsPage() {
         </div>
       </div>
 
+      {/* Analytics View Toggle - Premium Only */}
+      {user?.tier === 'premium' ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Analytics View</CardTitle>
+            <CardDescription>Choose how to view your analytics data</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Tabs defaultValue={analyticsViewMode} onValueChange={(value) => setAnalyticsViewMode(value as 'graphical' | 'standard')}>
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="graphical">Graphical View</TabsTrigger>
+                <TabsTrigger value="standard">Standard View</TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card>
+          <CardHeader>
+            <CardTitle>Analytics View</CardTitle>
+            <CardDescription>Upgrade to Premium for graphical analytics</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between p-4 border rounded-lg">
+              <div className="flex items-center space-x-4">
+                <Lock className="h-8 w-8 text-gray-400" />
+                <div>
+                  <h3 className="font-medium">Graphical Analytics</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Visualize your data with charts and graphs
+                  </p>
+                </div>
+              </div>
+              <Link href="/dashboard/subscription">
+                <Button size="sm">
+                  Upgrade to Premium
+                </Button>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Overview Stats */}
       <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
@@ -509,7 +584,7 @@ export default function AnalyticsPage() {
             <Card className="md:col-span-2">
               <CardHeader>
                 <CardTitle>Clicks Over Time</CardTitle>
-                <CardDescription>Daily click count for the selected period</CardDescription>
+                <CardDescription>Click trends over the selected period</CardDescription>
               </CardHeader>
               <CardContent>
                 {!analytics || Object.keys(analytics.clicksByDate).length === 0 ? (
@@ -520,7 +595,7 @@ export default function AnalyticsPage() {
                   </div>
                 ) : (
                   <>
-                    {user?.tier === 'premium' && analytics.restrictions.canSeeAdvancedCharts ? (
+                    {user?.tier === 'premium' && analytics.restrictions.canSeeAdvancedCharts && analyticsViewMode === 'graphical' ? (
                       // Advanced Line Chart for Premium users
                       <div className="h-80">
                         <ResponsiveContainer width="100%" height="100%">
@@ -628,7 +703,7 @@ export default function AnalyticsPage() {
                   </div>
                 ) : (
                   <>
-                    {user?.tier === 'premium' && analytics.restrictions.canSeeAdvancedCharts ? (
+                    {user?.tier === 'premium' && analytics.restrictions.canSeeAdvancedCharts && analyticsViewMode === 'graphical' ? (
                       // Advanced Bar Chart for Premium users
                       <div className="h-64">
                         <ResponsiveContainer width="100%" height="100%">
@@ -650,7 +725,7 @@ export default function AnalyticsPage() {
                       <div key={country} className="flex items-center justify-between">
                         <div className="flex items-center space-x-2">
                           <Globe className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-sm">{country}</span>
+                          <span className="text-sm">{countryCodeToName(country)}</span>
                         </div>
                         <div className="flex items-center space-x-2">
                           <div className="w-20 bg-gray-200 rounded-full h-2">
@@ -671,6 +746,42 @@ export default function AnalyticsPage() {
                 )}
               </CardContent>
             </Card>
+
+            {/* Top Cities - Premium Only */}
+            {user?.tier === 'premium' && analytics.clicksByCity && Object.keys(analytics.clicksByCity).length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Top Cities</CardTitle>
+                  <CardDescription>City-level visitor distribution</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {Object.entries(analytics.clicksByCity)
+                      .sort(([,a], [,b]) => b - a)
+                      .slice(0, 10)
+                      .map(([city, clicks]) => (
+                        <div key={city} className="flex items-center justify-between">
+                          <div className="flex items-center space-x-2">
+                            <Globe className="h-4 w-4 text-muted-foreground" />
+                            <span className="text-sm">{city || 'Unknown'}</span>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <div className="w-20 bg-gray-200 rounded-full h-2">
+                              <div 
+                                className="bg-green-600 h-2 rounded-full" 
+                                style={{ 
+                                        width: `${analytics.totalClicks > 0 ? (clicks / analytics.totalClicks) * 100 : 0}%` 
+                                }}
+                              ></div>
+                            </div>
+                            <span className="text-sm font-medium w-8 text-right">{clicks}</span>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Device Types */}
             <Card>
@@ -698,7 +809,7 @@ export default function AnalyticsPage() {
                   </div>
                 ) : (
                   <>
-                    {user?.tier === 'premium' && analytics.restrictions.canSeeAdvancedCharts ? (
+                    {user?.tier === 'premium' && analytics.restrictions.canSeeAdvancedCharts && analyticsViewMode === 'graphical' ? (
                       // Advanced Pie Chart for Premium users
                       <div className="h-64">
                         <ResponsiveContainer width="100%" height="100%">
@@ -773,7 +884,7 @@ export default function AnalyticsPage() {
                   </div>
                 ) : (
                   <>
-                    {user?.tier === 'premium' && analytics.restrictions.canSeeAdvancedCharts ? (
+                    {user?.tier === 'premium' && analytics.restrictions.canSeeAdvancedCharts && analyticsViewMode === 'graphical' ? (
                       // Advanced Horizontal Bar Chart for Premium users
                       <div className="h-64">
                         <ResponsiveContainer width="100%" height="100%">
@@ -829,6 +940,31 @@ export default function AnalyticsPage() {
             </div>
           ) : (
           <div className="grid gap-6 grid-cols-1 md:grid-cols-2">
+            {/* Top Cities - Premium Only */}
+            {user?.tier === 'premium' && analytics.clicksByCity && Object.keys(analytics.clicksByCity).length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Top Cities</CardTitle>
+                  <CardDescription>City-level visitor distribution</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    {Object.entries(analytics.clicksByCity)
+                      .sort(([,a], [,b]) => b - a)
+                      .slice(0, 10)
+                      .map(([city, clicks]) => (
+                        <div key={city} className="flex justify-between text-sm">
+                          <span>{city || 'Unknown'}</span>
+                          <span className="font-medium">
+                              {analytics.totalClicks > 0 ? Math.round((clicks / analytics.totalClicks) * 100) : 0}%
+                          </span>
+                        </div>
+                      ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             {/* Top Countries */}
             <Card>
               <CardHeader>
@@ -855,7 +991,7 @@ export default function AnalyticsPage() {
                   </div>
                 ) : (
                   <>
-                    {user?.tier === 'premium' && analytics.restrictions.canSeeAdvancedCharts ? (
+                    {user?.tier === 'premium' && analytics.restrictions.canSeeAdvancedCharts && analyticsViewMode === 'graphical' ? (
                       // Advanced Bar Chart for Premium users
                       <div className="h-64">
                         <ResponsiveContainer width="100%" height="100%">
@@ -877,7 +1013,7 @@ export default function AnalyticsPage() {
                       <div key={country} className="flex items-center justify-between">
                         <div className="flex items-center space-x-2">
                           <Globe className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-sm">{country}</span>
+                          <span className="text-sm">{countryCodeToName(country)}</span>
                         </div>
                         <div className="flex items-center space-x-2">
                           <div className="w-20 bg-gray-200 rounded-full h-2">
@@ -920,7 +1056,7 @@ export default function AnalyticsPage() {
                   </div>
                 ) : (
                   <>
-                    {user?.tier === 'premium' && analytics.restrictions.canSeeAdvancedCharts ? (
+                    {user?.tier === 'premium' && analytics.restrictions.canSeeAdvancedCharts && analyticsViewMode === 'graphical' ? (
                       // Advanced Horizontal Bar Chart for Premium users
                       <div className="h-64">
                         <ResponsiveContainer width="100%" height="100%">
@@ -976,6 +1112,31 @@ export default function AnalyticsPage() {
             </div>
           ) : (
           <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+            {/* Top Cities - Premium Only */}
+            {user?.tier === 'premium' && analytics.clicksByCity && Object.keys(analytics.clicksByCity).length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Top Cities</CardTitle>
+                  <CardDescription>City-level visitor distribution</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    {Object.entries(analytics.clicksByCity)
+                      .sort(([,a], [,b]) => b - a)
+                      .slice(0, 10)
+                      .map(([city, clicks]) => (
+                        <div key={city} className="flex justify-between text-sm">
+                          <span>{city || 'Unknown'}</span>
+                          <span className="font-medium">
+                              {analytics.totalClicks > 0 ? Math.round((clicks / analytics.totalClicks) * 100) : 0}%
+                          </span>
+                        </div>
+                      ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             <Card>
               <CardHeader>
                 <CardTitle>Geographic Distribution</CardTitle>
@@ -993,7 +1154,7 @@ export default function AnalyticsPage() {
                     .sort(([,a], [,b]) => b - a)
                     .map(([country, clicks]) => (
                       <div key={country} className="flex justify-between text-sm">
-                        <span>{country}</span>
+                        <span>{countryCodeToName(country)}</span>
                         <span className="font-medium">
                             {analytics.totalClicks > 0 ? Math.round((clicks / analytics.totalClicks) * 100) : 0}%
                         </span>

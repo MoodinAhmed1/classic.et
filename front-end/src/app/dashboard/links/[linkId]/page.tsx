@@ -33,6 +33,9 @@ interface AnalyticsData {
   clicksByDevice: { [key: string]: number };
   clicksByBrowser: { [key: string]: number };
   clicksByReferrer: { [key: string]: number };
+  clicksByCity?: { [key: string]: number };
+  clicksByReferrerPath?: { [key: string]: number };
+  clicksByHour?: { [key: string]: number };
   totalClicks: number;
 }
 
@@ -54,6 +57,7 @@ export default function LinkDetailsPage() {
   const [editTitle, setEditTitle] = useState('');
   const [editIsActive, setEditIsActive] = useState(true);
   const [editExpiresAt, setEditExpiresAt] = useState('');
+  const [editShortCode, setEditShortCode] = useState('');
 
   useEffect(() => {
     fetchLinkData();
@@ -72,6 +76,7 @@ export default function LinkDetailsPage() {
       setEditTitle(linkData.title || '');
       setEditIsActive(linkData.isActive);
       setEditExpiresAt(linkData.expiresAt ? new Date(linkData.expiresAt).toISOString().slice(0, 16) : '');
+      setEditShortCode(linkData.shortCode || '');
     } catch (error: any) {
       toast({
         title: "Error",
@@ -105,6 +110,7 @@ export default function LinkDetailsPage() {
         title: editTitle.trim() || "",
         isActive: editIsActive,
         expiresAt: editExpiresAt ? new Date(editExpiresAt).toISOString() : null,
+        ...(user?.tier === 'premium' && editShortCode.trim() && editShortCode.trim() !== link.shortCode ? { shortCode: editShortCode.trim() } : {}),
       });
 
       setLink({
@@ -112,6 +118,7 @@ export default function LinkDetailsPage() {
         title: editTitle.trim() || null,
         isActive: editIsActive,
         expiresAt: editExpiresAt ? new Date(editExpiresAt).toISOString() : null,
+        shortCode: editShortCode.trim() || link.shortCode,
       });
 
       setIsEditing(false);
@@ -233,7 +240,7 @@ export default function LinkDetailsPage() {
         </div>
       </div>
 
-      <Tabs defaultValue="overview" className="space-y-6">
+      <Tabs defaultValue="analytics" className="space-y-6">
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="analytics">Analytics</TabsTrigger>
@@ -442,6 +449,29 @@ export default function LinkDetailsPage() {
                   </CardContent>
                 </Card>
 
+                {/* City (Premium) */}
+                {user?.tier === 'premium' && analytics.clicksByCity && Object.keys(analytics.clicksByCity).length > 0 && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Top Cities</CardTitle>
+                      <CardDescription>City-level clicks</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2">
+                        {Object.entries(analytics.clicksByCity)
+                          .sort(([,a], [,b]) => b - a)
+                          .slice(0, 10)
+                          .map(([city, clicks]) => (
+                            <div key={city} className="flex items-center justify-between py-2">
+                              <span className="text-sm">{city || 'Unknown'}</span>
+                              <span className="text-sm font-medium">{clicks}</span>
+                            </div>
+                          ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
                 {/* Devices */}
                 <Card>
                   <CardHeader>
@@ -464,6 +494,29 @@ export default function LinkDetailsPage() {
                     </div>
                   </CardContent>
                 </Card>
+
+                {/* Referrer paths (Premium) */}
+                {user?.tier === 'premium' && analytics.clicksByReferrerPath && Object.keys(analytics.clicksByReferrerPath).length > 0 && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Referrer Paths</CardTitle>
+                      <CardDescription>Top referring hostnames and paths</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2">
+                        {Object.entries(analytics.clicksByReferrerPath)
+                          .sort(([,a], [,b]) => b - a)
+                          .slice(0, 10)
+                          .map(([path, clicks]) => (
+                            <div key={path} className="flex items-center justify-between py-2">
+                              <span className="text-sm truncate max-w-[220px]">{path}</span>
+                              <span className="text-sm font-medium">{clicks}</span>
+                            </div>
+                          ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
 
                 {/* Browsers */}
                 <Card>
@@ -506,6 +559,36 @@ export default function LinkDetailsPage() {
                     </div>
                   </CardContent>
                 </Card>
+
+                {/* Hourly breakdown (Premium) */}
+                {user?.tier === 'premium' && analytics.clicksByHour && Object.keys(analytics.clicksByHour).length > 0 && (
+                  <Card className="md:col-span-2">
+                    <CardHeader>
+                      <CardTitle>Hourly Clicks</CardTitle>
+                      <CardDescription>Time-based breakdown</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2">
+                        {Object.entries(analytics.clicksByHour)
+                          .sort(([a], [b]) => new Date(a).getTime() - new Date(b).getTime())
+                          .map(([hour, clicks]) => (
+                            <div key={hour} className="flex items-center justify-between py-2">
+                              <span className="text-sm">{new Date(hour).toLocaleString()}</span>
+                              <div className="flex items-center space-x-2">
+                                <div className="w-32 bg-gray-200 rounded-full h-2">
+                                  <div
+                                    className="bg-indigo-600 h-2 rounded-full"
+                                    style={{ width: `${Math.max(10, (clicks / Math.max(...Object.values(analytics.clicksByHour!))) * 100)}%` }}
+                                  ></div>
+                                </div>
+                                <span className="text-sm font-medium w-8 text-right">{clicks}</span>
+                              </div>
+                            </div>
+                          ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
               </div>
             </div>
           ) : (
@@ -566,6 +649,24 @@ export default function LinkDetailsPage() {
                     <p className="text-sm text-muted-foreground mt-1">
                       Leave empty for no expiration
                     </p>
+                  </div>
+                )}
+
+                {user?.tier === 'premium' && (
+                  <div>
+                    <Label htmlFor="edit-shortcode">Custom Short Code</Label>
+                    <div className="flex items-center space-x-2 mt-1">
+                      <span className="text-sm text-muted-foreground">/</span>
+                      <Input
+                        id="edit-shortcode"
+                        value={editShortCode}
+                        onChange={(e) => setEditShortCode(e.target.value)}
+                        placeholder="my-brand-code"
+                        disabled={!isEditing}
+                        className="font-mono"
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">Must be unique. Letters, numbers, and dashes recommended.</p>
                   </div>
                 )}
               </div>
