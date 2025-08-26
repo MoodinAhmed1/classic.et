@@ -1,4 +1,4 @@
-const API_BASE_URL = "https://back-end.xayrix1.workers.dev"
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "https://back-end.xayrix1.workers.dev"
 
 class AdminApiError extends Error {
   constructor(
@@ -15,13 +15,17 @@ async function adminApiRequest<T>(endpoint: string, options: RequestInit = {}): 
     credentials: "include", // Critical: enables cookies to be sent/received
     headers: {
       "Content-Type": "application/json",
-      "X-Admin-Request": "true", // Flag to identify admin requests
       ...options.headers,
     },
     ...options,
   }
 
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, config)
+  const base = API_BASE_URL || ""
+  if (!base) {
+    throw new Error("API base URL not configured. Set NEXT_PUBLIC_API_BASE_URL in your frontend environment.")
+  }
+  const url = `${base}${endpoint}`
+  const response = await fetch(url, config)
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({ error: "Unknown error" }))

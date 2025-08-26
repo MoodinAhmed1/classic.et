@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { useAdminAuth } from "@/contexts/admin-auth-context"
 import {
   LayoutDashboard,
   Users,
@@ -78,6 +79,7 @@ const navigation = [
 export function AdminSidebar({ className }: AdminSidebarProps) {
   const [collapsed, setCollapsed] = useState(false)
   const pathname = usePathname()
+  const { hasPermission } = useAdminAuth()
 
   return (
     <div
@@ -113,7 +115,22 @@ export function AdminSidebar({ className }: AdminSidebarProps) {
       {/* Navigation */}
       <ScrollArea className="flex-1 px-3 py-4">
         <nav className="space-y-2">
-          {navigation.map((item) => {
+          {navigation
+            .filter((item) => {
+              const routeToPerm: Record<string, { resource: string; action: string }> = {
+                "/admin/dashboard": { resource: "system", action: "read" },
+                "/admin/users": { resource: "users", action: "read" },
+                "/admin/links": { resource: "links", action: "read" },
+                "/admin/analytics": { resource: "analytics", action: "read" },
+                "/admin/subscriptions": { resource: "subscriptions", action: "read" },
+                "/admin/payments": { resource: "subscriptions", action: "read" },
+                "/admin/activity": { resource: "system", action: "read" },
+                "/admin/settings": { resource: "system", action: "write" },
+              }
+              const perm = routeToPerm[item.href]
+              return perm ? hasPermission(perm.resource, perm.action) : true
+            })
+            .map((item) => {
             const isActive = pathname === item.href
             return (
               <Link key={item.name} href={item.href}>

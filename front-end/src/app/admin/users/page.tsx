@@ -27,6 +27,7 @@ import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Search, Plus, MoreHorizontal, Edit, Trash2, Mail, Calendar, RefreshCw } from "lucide-react"
+import { adminApi } from "@/lib/admin-api"
 
 interface AdminUser {
   id: string
@@ -72,58 +73,8 @@ export default function UsersPage() {
   const fetchUsers = async () => {
     try {
       setIsLoading(true)
-      // Mock data for now - replace with actual API call
-      const mockUsers: AdminUser[] = [
-        {
-          id: "1",
-          email: "john.doe@example.com",
-          name: "John Doe",
-          tier: "pro",
-          subscription_status: "active",
-          email_verified: true,
-          created_at: "2024-01-15T10:30:00Z",
-          updated_at: "2024-01-20T14:45:00Z",
-          links_count: 25,
-          last_login: "2024-01-25T09:15:00Z",
-        },
-        {
-          id: "2",
-          email: "jane.smith@example.com",
-          name: "Jane Smith",
-          tier: "free",
-          subscription_status: "active",
-          email_verified: true,
-          created_at: "2024-01-10T08:20:00Z",
-          updated_at: "2024-01-22T16:30:00Z",
-          links_count: 5,
-          last_login: "2024-01-24T11:45:00Z",
-        },
-        {
-          id: "3",
-          email: "bob.wilson@example.com",
-          name: "Bob Wilson",
-          tier: "premium",
-          subscription_status: "active",
-          email_verified: false,
-          created_at: "2024-01-05T12:15:00Z",
-          updated_at: "2024-01-18T10:20:00Z",
-          links_count: 150,
-          last_login: "2024-01-23T15:30:00Z",
-        },
-        {
-          id: "4",
-          email: "alice.brown@example.com",
-          name: "Alice Brown",
-          tier: "pro",
-          subscription_status: "past_due",
-          email_verified: true,
-          created_at: "2024-01-12T14:45:00Z",
-          updated_at: "2024-01-21T09:10:00Z",
-          links_count: 45,
-          last_login: "2024-01-22T13:20:00Z",
-        },
-      ]
-      setUsers(mockUsers)
+      const res = await adminApi.getUsers()
+      setUsers(res.users as any)
     } catch (error) {
       console.error("Failed to fetch users:", error)
     } finally {

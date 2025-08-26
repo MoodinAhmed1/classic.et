@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS admin_users (
   email TEXT UNIQUE NOT NULL,
   name TEXT NOT NULL,
   password_hash TEXT NOT NULL,
-  role TEXT NOT NULL CHECK (role IN ('super_admin', 'admin', 'moderator')),
+  role TEXT NOT NULL CHECK (role IN ('super_admin', 'admin', 'moderator', 'analyst')),
   permissions JSON NOT NULL, -- Store permissions as JSON array
   is_active BOOLEAN DEFAULT true,
   last_login_at DATETIME,
@@ -66,7 +66,7 @@ CREATE INDEX IF NOT EXISTS idx_admin_activity_log_resource ON admin_activity_log
 CREATE INDEX IF NOT EXISTS idx_admin_settings_key ON admin_settings(key);
 
 -- Insert default super admin (password should be changed on first login)
--- Default password: "admin123" (hashed with bcrypt)
+-- Default password: "admin123" (SHA-256)
 INSERT INTO admin_users (
   id, 
   email, 
@@ -79,7 +79,7 @@ INSERT INTO admin_users (
   'admin_001',
   'admin@yoursite.com',
   'Super Administrator',
-  '$2b$10$rQZ8kHWKQVz7mXGKGx.oHOGKGx.oHOGKGx.oHOGKGx.oHOGKGx.oHO', -- This should be properly hashed
+  '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9', -- sha256(admin123)
   'super_admin',
   '["all"]', -- Super admin has all permissions
   true

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { adminApi } from "@/lib/admin-api"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -27,23 +28,18 @@ export default function AdminDashboardPage() {
 
   const fetchDashboardStats = async () => {
     try {
-      // This would be replaced with actual API call
-      // const response = await fetch('/api/admin/dashboard/stats')
-      // const data = await response.json()
-
-      // Mock data for now
-      const mockStats: DashboardStats = {
-        totalUsers: 1247,
-        totalLinks: 8934,
-        totalClicks: 45672,
-        totalRevenue: 12450,
-        activeSubscriptions: 89,
-        pendingPayments: 3,
-        recentActivity: 156,
+      const res = await adminApi.getSystemAnalytics(30)
+      const mapped: DashboardStats = {
+        totalUsers: res.overview.totalUsers,
+        totalLinks: res.overview.totalLinks,
+        totalClicks: res.overview.totalClicks,
+        totalRevenue: Math.round(res.revenue?.total || 0),
+        activeSubscriptions: res.overview.activeUsers,
+        pendingPayments: 0,
+        recentActivity: res.recentActivity?.length || 0,
         systemHealth: "healthy",
       }
-
-      setStats(mockStats)
+      setStats(mapped)
     } catch (error) {
       console.error("Failed to fetch dashboard stats:", error)
     } finally {

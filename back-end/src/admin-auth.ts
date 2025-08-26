@@ -7,8 +7,9 @@ export interface AdminUser {
   id: string
   email: string
   name: string
-  role: "super_admin" | "admin" | "moderator"
-  permissions: string[]
+  role: "super_admin" | "admin" | "moderator" | "analyst"
+  // Permissions stored as JSON object: { resource: string[] actions }
+  permissions: Record<string, string[]>
   is_active: boolean
   last_login_at?: string
   created_at: string
@@ -27,18 +28,73 @@ export interface AdminSession {
 }
 
 // Password hashing utilities (adapted from existing auth)
-export async function hashPassword(password: string): Promise<string> {
-  const encoder = new TextEncoder()
-  const data = encoder.encode(password)
-  const hash = await crypto.subtle.digest("SHA-256", data)
-  return Array.from(new Uint8Array(hash))
+// --- Admin password hashing (PBKDF2 with SHA-256) with legacy SHA-256 fallback ---
+const PBKDF2_ITERATIONS = 150000
+
+function toHex(buffer: ArrayBuffer): string {
+  return Array.from(new Uint8Array(buffer))
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("")
 }
 
-export async function verifyPassword(password: string, hash: string): Promise<boolean> {
-  const hashedPassword = await hashPassword(password)
-  return hashedPassword === hash
+function fromHex(hex: string): Uint8Array {
+  const bytes = new Uint8Array(hex.length / 2)
+  for (let i = 0; i < bytes.length; i++) {
+    bytes[i] = parseInt(hex.substr(i * 2, 2), 16)
+  }
+  return bytes
+}
+
+export async function hashAdminPasswordPBKDF2(password: string): Promise<string> {
+  const salt = crypto.getRandomValues(new Uint8Array(16))
+  const keyMaterial = await crypto.subtle.importKey("raw", new TextEncoder().encode(password), { name: "PBKDF2" }, false, ["deriveBits"])
+  const derivedBits = await crypto.subtle.deriveBits(
+    { name: "PBKDF2", hash: "SHA-256", salt, iterations: PBKDF2_ITERATIONS },
+    keyMaterial,
+    256,
+  )
+  const saltHex = toHex(salt.buffer)
+  const hashHex = toHex(derivedBits)
+  return `pbkdf2$${PBKDF2_ITERATIONS}$${saltHex}$${hashHex}`
+}
+
+export function isLegacySha256Hash(hash: string): boolean {
+  return /^[a-f0-9]{64}$/i.test(hash)
+}
+
+async function sha256Hex(input: string): Promise<string> {
+  const data = new TextEncoder().encode(input)
+  const digest = await crypto.subtle.digest("SHA-256", data)
+  return toHex(digest)
+}
+
+export async function verifyAdminPassword(password: string, storedHash: string): Promise<{
+  valid: boolean
+  scheme: "pbkdf2" | "sha256" | "unknown"
+}> {
+  if (storedHash.startsWith("pbkdf2$")) {
+    const parts = storedHash.split("$")
+    if (parts.length !== 4) return { valid: false, scheme: "unknown" }
+    const iterations = Number(parts[1]) || PBKDF2_ITERATIONS
+    const saltHex = parts[2]
+    const expectedHex = parts[3]
+
+    const keyMaterial = await crypto.subtle.importKey("raw", new TextEncoder().encode(password), { name: "PBKDF2" }, false, ["deriveBits"])
+    const derivedBits = await crypto.subtle.deriveBits(
+      { name: "PBKDF2", hash: "SHA-256", salt: fromHex(saltHex), iterations },
+      keyMaterial,
+      256,
+    )
+    const actualHex = toHex(derivedBits)
+    return { valid: actualHex === expectedHex, scheme: "pbkdf2" }
+  }
+
+  if (isLegacySha256Hash(storedHash)) {
+    const actual = await sha256Hex(password)
+    return { valid: actual === storedHash, scheme: "sha256" }
+  }
+
+  return { valid: false, scheme: "unknown" }
 }
 
 // Generate secure session token
@@ -78,8 +134,13 @@ export const adminAuthMiddleware = async (c: any, next: any) => {
       return c.json({ error: "Admin account not found or inactive" }, 401)
     }
 
-    // Parse permissions
-    admin.permissions = JSON.parse(admin.permissions)
+    // Parse permissions, normalize to object
+    try {
+      const parsed = JSON.parse(admin.permissions)
+      admin.permissions = Array.isArray(parsed) ? {} : parsed
+    } catch {
+      admin.permissions = {}
+    }
 
     c.set("adminUser", admin)
     c.set("jwtPayload", payload)
@@ -90,7 +151,7 @@ export const adminAuthMiddleware = async (c: any, next: any) => {
 }
 
 // Permission checking middleware
-export const requirePermission = (permission: string) => {
+export const requirePermission = (resource: string, action: string) => {
   return async (c: any, next: any) => {
     const admin = c.get("adminUser") as AdminUser
 
@@ -99,17 +160,19 @@ export const requirePermission = (permission: string) => {
     }
 
     // Super admin has all permissions
-    if (admin.role === "super_admin" || admin.permissions.includes("all")) {
+    if (admin.role === "super_admin") {
       await next()
       return
     }
 
     // Check specific permission
-    if (!admin.permissions.includes(permission)) {
+    const resourcePermissions = admin.permissions[resource as keyof typeof admin.permissions]
+    const allowed = Array.isArray(resourcePermissions) && resourcePermissions.includes(action)
+    if (!allowed) {
       return c.json(
         {
           error: "Insufficient permissions",
-          required: permission,
+          required: { resource, action },
           current: admin.permissions,
         },
         403,

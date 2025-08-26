@@ -6,6 +6,7 @@ import { cors } from 'hono/cors';
 import { jwt, sign, verify } from 'hono/jwt';
 import { setCookie, getCookie } from 'hono/cookie';
 import { UAParser } from 'ua-parser-js';
+import { adminAuthMiddleware, requirePermission, getAdminByEmail, updateAdminLastLogin } from './admin-auth';
 import { 
   checkUsageLimit, 
   incrementUsage, 
@@ -1786,6 +1787,173 @@ app.post('/api/auth/logout', async (c) => {
   return c.json({ success: true });
 });
 
+// ===== Admin Auth Routes =====
+app.post('/api/admin/auth/login', async (c) => {
+  try {
+    const { email, password } = await c.req.json();
+    if (!email || !password) {
+      return c.json({ error: 'Email and password are required' }, 400);
+    }
+
+    const admin = await getAdminByEmail(c.env.DB as any, email);
+    if (!admin) {
+      return c.json({ error: 'Invalid credentials' }, 401);
+    }
+
+    const row = await (c.env.DB as any)
+      .prepare('SELECT password_hash FROM admin_users WHERE id = ?')
+      .bind((admin as any).id)
+      .first();
+    if (!row || !(await verifyPassword(password, (row as any).password_hash))) {
+      return c.json({ error: 'Invalid credentials' }, 401);
+    }
+
+    await updateAdminLastLogin(c.env.DB as any, (admin as any).id);
+
+    const token = await sign(
+      { adminId: (admin as any).id, email: (admin as any).email, role: (admin as any).role, exp: Math.floor(Date.now() / 1000) + 60 * 60 * 8 },
+      (c.env as any).JWT_SECRET,
+    );
+
+    setCookie(c, 'admin_auth_token', token, {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'None',
+      path: '/',
+      maxAge: 60 * 60 * 8,
+    });
+
+    const adminResponse = {
+      id: (admin as any).id,
+      email: (admin as any).email,
+      name: (admin as any).name,
+      role: (admin as any).role,
+      permissions: (admin as any).permissions || {},
+      isActive: (admin as any).is_active,
+      lastLoginAt: (admin as any).last_login_at || null,
+      createdAt: (admin as any).created_at,
+    };
+    return c.json({ adminUser: adminResponse });
+  } catch (error) {
+    console.error('Admin login error:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+app.get('/api/admin/auth/me', adminAuthMiddleware as any, async (c) => {
+  const admin = (c as any).get('adminUser');
+  const adminResponse = {
+    id: admin.id,
+    email: admin.email,
+    name: admin.name,
+    role: admin.role,
+    permissions: admin.permissions || {},
+    isActive: admin.is_active,
+    lastLoginAt: admin.last_login_at || null,
+    createdAt: admin.created_at,
+  };
+  return c.json({ adminUser: adminResponse });
+});
+
+app.post('/api/admin/auth/logout', async (c) => {
+  setCookie(c, 'admin_auth_token', '', {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'None',
+    path: '/',
+    maxAge: 0,
+  });
+  return c.json({ success: true });
+});
+
+// Admin analytics (basic aggregate derived from existing tables)
+app.get('/api/admin/analytics/system', adminAuthMiddleware as any, async (c) => {
+  try {
+    const totalUsersRow = await (c.env.DB as any).prepare('SELECT COUNT(*) as cnt FROM users').first();
+    const totalLinksRow = await (c.env.DB as any).prepare('SELECT COUNT(*) as cnt FROM links').first();
+    const totalClicksRow = await (c.env.DB as any).prepare('SELECT SUM(click_count) as cnt FROM links').first();
+
+    const overview = {
+      totalUsers: Number((totalUsersRow as any)?.cnt || 0),
+      totalLinks: Number((totalLinksRow as any)?.cnt || 0),
+      totalClicks: Number((totalClicksRow as any)?.cnt || 0),
+      activeUsers: 0,
+    };
+
+    const revenue = { total: 0, monthly: 0, yearly: 0 };
+    const usersByTier: Record<string, number> = {};
+    const linksByDate: Record<string, number> = {};
+    const clicksByDate: Record<string, number> = {};
+    const topLinks: any[] = [];
+    const recentActivity: any[] = [];
+
+    return c.json({ overview, usersByTier, linksByDate, clicksByDate, topLinks, recentActivity, revenue });
+  } catch (e) {
+    console.error('Admin analytics error:', e);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+// Admin: list regular users
+app.get('/api/admin/users/regular', adminAuthMiddleware as any, async (c) => {
+  try {
+    // Optional: permission check
+    // await (requirePermission('users', 'read') as any)(c, async () => {});
+
+    const limit = Math.max(1, Math.min(100, parseInt((c.req.query('limit') as string) || '50')));
+    const offset = Math.max(0, parseInt((c.req.query('offset') as string) || '0'));
+    const search = (c.req.query('search') as string) || '';
+    const tier = (c.req.query('tier') as string) || '';
+
+    let baseQuery = 'FROM users WHERE 1=1';
+    const params: any[] = [];
+    if (search) {
+      baseQuery += ' AND (LOWER(name) LIKE ? OR LOWER(email) LIKE ?)';
+      params.push(`%${search.toLowerCase()}%`, `%${search.toLowerCase()}%`);
+    }
+    if (tier) {
+      baseQuery += ' AND tier = ?';
+      params.push(tier);
+    }
+
+    const totalRow = await (c.env.DB as any)
+      .prepare(`SELECT COUNT(*) as cnt ${baseQuery}`)
+      .bind(...params)
+      .first();
+    const total = Number((totalRow as any)?.cnt || 0);
+
+    const rows = await (c.env.DB as any)
+      .prepare(
+        `SELECT id, email, name, tier, subscription_status, email_verified, created_at, updated_at ${baseQuery} ORDER BY created_at DESC LIMIT ? OFFSET ?`,
+      )
+      .bind(...params, limit, offset)
+      .all();
+
+    const users = (rows?.results || []).map((u: any) => ({
+      id: u.id,
+      email: u.email,
+      name: u.name,
+      tier: u.tier,
+      subscription_status: u.subscription_status,
+      email_verified: !!u.email_verified,
+      created_at: u.created_at,
+      updated_at: u.updated_at,
+      links_count: undefined,
+      last_login: undefined,
+    }));
+
+    const pagination = {
+      limit,
+      offset,
+      hasMore: offset + users.length < total,
+    };
+
+    return c.json({ users, total, pagination });
+  } catch (e) {
+    console.error('Admin users list error:', e);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
 app.get('/api/auth/me', authMiddleware, async (c) => {
   try {
     const payload = c.get('jwtPayload');

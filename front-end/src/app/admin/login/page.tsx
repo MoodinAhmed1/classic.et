@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Eye, EyeOff, Shield } from "lucide-react"
+import { adminApi } from "@/lib/admin-api"
 
 export default function AdminLoginPage() {
   const [email, setEmail] = useState("")
@@ -25,22 +26,8 @@ export default function AdminLoginPage() {
     setError("")
 
     try {
-      const response = await fetch("/api/admin/auth/login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email, password }),
-      })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.error || "Login failed")
-      }
-
-      // Redirect to admin dashboard
-      router.push("/admin/dashboard")
+      await adminApi.login({ email, password })
+      router.push("/admin")
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred")
     } finally {
