@@ -199,6 +199,31 @@ export const adminApi = {
     }>(`/api/admin/subscriptions?${query}`)
   },
 
+  getTransactions: async (params?: { limit?: number; offset?: number; status?: string }) => {
+    const query = new URLSearchParams()
+    if (params?.limit) query.set("limit", params.limit.toString())
+    if (params?.offset) query.set("offset", params.offset.toString())
+    if (params?.status) query.set("status", params.status)
+
+    return adminApiRequest<{
+      transactions: any[]
+      total: number
+      pagination: { limit: number; offset: number; hasMore: boolean }
+    }>(`/api/admin/transactions?${query}`)
+  },
+
+  refundTransaction: async (id: string) => {
+    return adminApiRequest<{ transaction: any }>(`/api/admin/transactions/${id}/refund`, {
+      method: 'POST',
+    })
+  },
+
+  verifyTransaction: async (txRef: string) => {
+    return adminApiRequest<{ transaction: any; chapa: any }>(`/api/admin/transactions/${encodeURIComponent(txRef)}/verify`, {
+      method: 'POST',
+    })
+  },
+
   // System Settings
   getSettings: async () => {
     return adminApiRequest<{ settings: any[] }>("/api/admin/settings")

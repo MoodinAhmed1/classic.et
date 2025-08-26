@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { adminApi } from "@/lib/admin-api"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -94,77 +95,36 @@ export default function AnalyticsPage() {
   const fetchAnalyticsData = async () => {
     try {
       setIsLoading(true)
-      // Mock data for now - replace with actual API call
-      const mockData: AnalyticsData = {
+      const days = timeRange === "7d" ? 7 : timeRange === "90d" ? 90 : timeRange === "1y" ? 365 : 30
+      const res = await adminApi.getSystemAnalytics(days)
+      const data: AnalyticsData = {
         overview: {
-          totalClicks: 45672,
-          totalUsers: 1247,
-          totalLinks: 8934,
-          clicksGrowth: 23.5,
-          usersGrowth: 12.3,
-          linksGrowth: 8.7,
+          totalClicks: res.overview.totalClicks || 0,
+          totalUsers: res.overview.totalUsers || 0,
+          totalLinks: res.overview.totalLinks || 0,
+          clicksGrowth: 0,
+          usersGrowth: 0,
+          linksGrowth: 0,
         },
-        clicksOverTime: [
-          { date: "2024-01-01", clicks: 1200, users: 45, links: 23 },
-          { date: "2024-01-02", clicks: 1350, users: 52, links: 28 },
-          { date: "2024-01-03", clicks: 1180, users: 48, links: 25 },
-          { date: "2024-01-04", clicks: 1420, users: 58, links: 32 },
-          { date: "2024-01-05", clicks: 1680, users: 65, links: 38 },
-          { date: "2024-01-06", clicks: 1890, users: 72, links: 42 },
-          { date: "2024-01-07", clicks: 2100, users: 78, links: 45 },
-          { date: "2024-01-08", clicks: 1950, users: 74, links: 41 },
-          { date: "2024-01-09", clicks: 2250, users: 85, links: 48 },
-          { date: "2024-01-10", clicks: 2400, users: 92, links: 52 },
-          { date: "2024-01-11", clicks: 2180, users: 88, links: 49 },
-          { date: "2024-01-12", clicks: 2350, users: 95, links: 54 },
-          { date: "2024-01-13", clicks: 2500, users: 98, links: 58 },
-          { date: "2024-01-14", clicks: 2650, users: 102, links: 61 },
-        ],
-        deviceStats: [
-          { device: "Desktop", count: 18500, percentage: 40.5 },
-          { device: "Mobile", count: 22100, percentage: 48.4 },
-          { device: "Tablet", count: 5072, percentage: 11.1 },
-        ],
-        browserStats: [
-          { browser: "Chrome", count: 25600, percentage: 56.1 },
-          { browser: "Safari", count: 9800, percentage: 21.5 },
-          { browser: "Firefox", count: 5400, percentage: 11.8 },
-          { browser: "Edge", count: 3200, percentage: 7.0 },
-          { browser: "Other", count: 1672, percentage: 3.6 },
-        ],
-        countryStats: [
-          { country: "Ethiopia", count: 15200, percentage: 33.3 },
-          { country: "United States", count: 8900, percentage: 19.5 },
-          { country: "United Kingdom", count: 4500, percentage: 9.9 },
-          { country: "Germany", count: 3800, percentage: 8.3 },
-          { country: "Canada", count: 2900, percentage: 6.4 },
-          { country: "Other", count: 10372, percentage: 22.6 },
-        ],
-        topLinks: [
-          { id: "1", title: "YouTube Video", shortCode: "yt999", clicks: 1567, user: "John Doe" },
-          { id: "2", title: "GitHub Repository", shortCode: "gh456", clicks: 1245, user: "Jane Smith" },
-          { id: "3", title: "Documentation", shortCode: "docs123", clicks: 987, user: "Bob Wilson" },
-          { id: "4", title: "Product Demo", shortCode: "demo789", clicks: 856, user: "Alice Brown" },
-          { id: "5", title: "Blog Post", shortCode: "blog456", clicks: 743, user: "Charlie Davis" },
-        ],
-        revenueOverTime: [
-          { date: "2024-01-01", revenue: 850, subscriptions: 12 },
-          { date: "2024-01-02", revenue: 920, subscriptions: 15 },
-          { date: "2024-01-03", revenue: 780, subscriptions: 11 },
-          { date: "2024-01-04", revenue: 1100, subscriptions: 18 },
-          { date: "2024-01-05", revenue: 1250, subscriptions: 22 },
-          { date: "2024-01-06", revenue: 1400, subscriptions: 25 },
-          { date: "2024-01-07", revenue: 1650, subscriptions: 28 },
-          { date: "2024-01-08", revenue: 1520, subscriptions: 26 },
-          { date: "2024-01-09", revenue: 1800, subscriptions: 32 },
-          { date: "2024-01-10", revenue: 1950, subscriptions: 35 },
-          { date: "2024-01-11", revenue: 1720, subscriptions: 31 },
-          { date: "2024-01-12", revenue: 2100, subscriptions: 38 },
-          { date: "2024-01-13", revenue: 2250, subscriptions: 42 },
-          { date: "2024-01-14", revenue: 2400, subscriptions: 45 },
-        ],
+        clicksOverTime: Object.entries(res.clicksByDate || {}).map(([date, clicks]) => ({
+          date,
+          clicks: Number(clicks || 0),
+          users: 0,
+          links: 0,
+        })),
+        deviceStats: (res.deviceStats || []).map((d: any) => ({ device: d.device, count: d.count, percentage: 0 })),
+        browserStats: (res.browserStats || []).map((b: any) => ({ browser: b.browser, count: b.count, percentage: 0 })),
+        countryStats: (res.countryStats || []).map((c: any) => ({ country: c.country, count: c.count, percentage: 0 })),
+        topLinks: (res.topLinks || []).map((l: any) => ({
+          id: l.id,
+          title: l.title || l.original_url || "Untitled",
+          shortCode: l.short_code,
+          clicks: l.click_count || 0,
+          user: l.user_name || l.user_id || "",
+        })),
+        revenueOverTime: [],
       }
-      setAnalyticsData(mockData)
+      setAnalyticsData(data)
     } catch (error) {
       console.error("Failed to fetch analytics data:", error)
     } finally {

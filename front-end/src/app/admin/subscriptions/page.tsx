@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { adminApi } from "@/lib/admin-api"
 import { AdminHeader } from "@/components/admin-header"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -108,181 +109,17 @@ export default function SubscriptionManagement() {
   const fetchData = async () => {
     setLoading(true)
     try {
-      // Mock data - replace with real API calls
-      const mockSubscriptions: Subscription[] = [
-        {
-          id: "sub_1",
-          user_id: "user_1",
-          user_name: "John Doe",
-          user_email: "john@example.com",
-          plan_id: "pro",
-          plan_name: "Pro",
-          tier: "pro",
-          status: "active",
-          billing_cycle: "monthly",
-          amount: 30000,
-          currency: "ETB",
-          current_period_start: "2024-01-01T00:00:00Z",
-          current_period_end: "2024-02-01T00:00:00Z",
-          cancel_at_period_end: false,
-          created_at: "2024-01-01T00:00:00Z",
-          updated_at: "2024-01-01T00:00:00Z",
-        },
-        {
-          id: "sub_2",
-          user_id: "user_2",
-          user_name: "Sarah Wilson",
-          user_email: "sarah@example.com",
-          plan_id: "premium",
-          plan_name: "Pro Extreme",
-          tier: "premium",
-          status: "active",
-          billing_cycle: "yearly",
-          amount: 900000,
-          currency: "ETB",
-          current_period_start: "2024-01-01T00:00:00Z",
-          current_period_end: "2025-01-01T00:00:00Z",
-          cancel_at_period_end: false,
-          created_at: "2024-01-01T00:00:00Z",
-          updated_at: "2024-01-01T00:00:00Z",
-        },
-        {
-          id: "sub_3",
-          user_id: "user_3",
-          user_name: "Mike Johnson",
-          user_email: "mike@example.com",
-          plan_id: "pro",
-          plan_name: "Pro",
-          tier: "pro",
-          status: "past_due",
-          billing_cycle: "monthly",
-          amount: 30000,
-          currency: "ETB",
-          current_period_start: "2024-01-01T00:00:00Z",
-          current_period_end: "2024-02-01T00:00:00Z",
-          cancel_at_period_end: true,
-          created_at: "2024-01-01T00:00:00Z",
-          updated_at: "2024-01-15T00:00:00Z",
-        },
-      ]
+      const res = await adminApi.getSubscriptions()
+      setSubscriptions(res.subscriptions as any)
+      setPlans([])
+      try {
+        const tx = await adminApi.getTransactions()
+        setTransactions(tx.transactions as any)
+      } catch (e) {
+        setTransactions([])
+      }
 
-      const mockPlans: SubscriptionPlan[] = [
-        {
-          id: "free",
-          name: "Free",
-          tier: "free",
-          price_monthly: 0,
-          price_yearly: 0,
-          features: ["Basic link shortening", "7-day analytics", "Standard support"],
-          limits: {
-            links_per_month: 5,
-            api_requests_per_month: 0,
-            custom_domains: 0,
-            analytics_retention_days: 7,
-            team_members: 1,
-          },
-          created_at: "2024-01-01T00:00:00Z",
-        },
-        {
-          id: "pro",
-          name: "Pro",
-          tier: "pro",
-          price_monthly: 30000,
-          price_yearly: 300000,
-          features: [
-            "Advanced analytics",
-            "Custom domains",
-            "API access",
-            "Email support",
-            "Link scheduling",
-            "QR codes",
-          ],
-          limits: {
-            links_per_month: 100,
-            api_requests_per_month: 1000,
-            custom_domains: 1,
-            analytics_retention_days: 30,
-            team_members: 1,
-          },
-          created_at: "2024-01-01T00:00:00Z",
-        },
-        {
-          id: "premium",
-          name: "Pro Extreme",
-          tier: "premium",
-          price_monthly: 90000,
-          price_yearly: 900000,
-          features: [
-            "Unlimited links",
-            "Full analytics",
-            "Multiple custom domains",
-            "Unlimited API",
-            "Priority support",
-            "Team collaboration",
-            "White-label options",
-          ],
-          limits: {
-            links_per_month: -1,
-            api_requests_per_month: -1,
-            custom_domains: 5,
-            analytics_retention_days: 365,
-            team_members: 3,
-          },
-          created_at: "2024-01-01T00:00:00Z",
-        },
-      ]
-
-      const mockTransactions: PaymentTransaction[] = [
-        {
-          id: "txn_1",
-          user_id: "user_1",
-          user_name: "John Doe",
-          user_email: "john@example.com",
-          plan_name: "Pro",
-          tx_ref: "TX_123456789",
-          amount: 30000,
-          currency: "ETB",
-          billing_cycle: "monthly",
-          status: "success",
-          created_at: "2024-01-25T10:30:00Z",
-          updated_at: "2024-01-25T10:35:00Z",
-        },
-        {
-          id: "txn_2",
-          user_id: "user_2",
-          user_name: "Sarah Wilson",
-          user_email: "sarah@example.com",
-          plan_name: "Pro Extreme",
-          tx_ref: "TX_987654321",
-          amount: 900000,
-          currency: "ETB",
-          billing_cycle: "yearly",
-          status: "success",
-          created_at: "2024-01-20T14:22:00Z",
-          updated_at: "2024-01-20T14:25:00Z",
-        },
-        {
-          id: "txn_3",
-          user_id: "user_3",
-          user_name: "Mike Johnson",
-          user_email: "mike@example.com",
-          plan_name: "Pro",
-          tx_ref: "TX_456789123",
-          amount: 30000,
-          currency: "ETB",
-          billing_cycle: "monthly",
-          status: "failed",
-          created_at: "2024-01-15T09:15:00Z",
-          updated_at: "2024-01-15T09:20:00Z",
-        },
-      ]
-
-      setTimeout(() => {
-        setSubscriptions(mockSubscriptions)
-        setPlans(mockPlans)
-        setTransactions(mockTransactions)
-        setLoading(false)
-      }, 1000)
+      setLoading(false)
     } catch (error) {
       console.error("Failed to fetch subscription data:", error)
       setLoading(false)
@@ -357,7 +194,7 @@ export default function SubscriptionManagement() {
   }
 
   const formatCurrency = (amount: number, currency: string) => {
-    return `${(amount / 100).toLocaleString()} ${currency}`
+    return `${amount.toLocaleString()} ${currency}`
   }
 
   const handleEditPlan = (plan: SubscriptionPlan) => {

@@ -34,6 +34,7 @@ import {
   BarChart3,
 } from "lucide-react"
 import { useAdminAuth } from "@/contexts/admin-auth-context"
+import { adminApi } from "@/lib/admin-api"
 
 interface AdminUser {
   id: string
@@ -115,56 +116,21 @@ export default function AdminUserManagement() {
   const fetchAdmins = async () => {
     setLoading(true)
     try {
-      // Mock data - replace with real API calls
-      const mockAdmins: AdminUser[] = [
-        {
-          id: "admin_1",
-          email: "super@admin.com",
-          name: "Super Admin",
-          role: "super_admin",
-          permissions: ROLE_PERMISSIONS.super_admin,
-          isActive: true,
-          lastLoginAt: "2024-01-25T09:15:00Z",
-          createdAt: "2024-01-01T00:00:00Z",
-        },
-        {
-          id: "admin_2",
-          email: "admin@admin.com",
-          name: "Admin User",
-          role: "admin",
-          permissions: ROLE_PERMISSIONS.admin,
-          isActive: true,
-          lastLoginAt: "2024-01-24T14:30:00Z",
-          createdAt: "2024-01-05T00:00:00Z",
-        },
-        {
-          id: "admin_3",
-          email: "moderator@admin.com",
-          name: "Moderator User",
-          role: "moderator",
-          permissions: ROLE_PERMISSIONS.moderator,
-          isActive: true,
-          lastLoginAt: "2024-01-23T11:45:00Z",
-          createdAt: "2024-01-10T00:00:00Z",
-        },
-        {
-          id: "admin_4",
-          email: "analyst@admin.com",
-          name: "Analytics User",
-          role: "analyst",
-          permissions: ROLE_PERMISSIONS.analyst,
-          isActive: false,
-          lastLoginAt: "2024-01-20T16:20:00Z",
-          createdAt: "2024-01-15T00:00:00Z",
-        },
-      ]
-
-      setTimeout(() => {
-        setAdmins(mockAdmins)
-        setLoading(false)
-      }, 1000)
+      const res = await adminApi.getAdminUsers()
+      const mapped = (res.adminUsers as any[]).map((u: any) => ({
+        id: u.id,
+        email: u.email,
+        name: u.name,
+        role: u.role,
+        permissions: u.permissions || ROLE_PERMISSIONS[u.role as keyof typeof ROLE_PERMISSIONS] || ROLE_PERMISSIONS.admin,
+        isActive: u.is_active ?? u.isActive ?? true,
+        lastLoginAt: u.last_login_at ?? u.lastLoginAt ?? null,
+        createdAt: u.created_at ?? u.createdAt,
+      }))
+      setAdmins(mapped)
     } catch (error) {
       console.error("Failed to fetch admin users:", error)
+    } finally {
       setLoading(false)
     }
   }

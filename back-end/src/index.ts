@@ -1869,9 +1869,54 @@ app.post('/api/admin/auth/logout', async (c) => {
 // Admin analytics (basic aggregate derived from existing tables)
 app.get('/api/admin/analytics/system', adminAuthMiddleware as any, async (c) => {
   try {
+    const days = Math.max(1, Math.min(365, parseInt((c.req.query('days') as string) || '30')));
+
     const totalUsersRow = await (c.env.DB as any).prepare('SELECT COUNT(*) as cnt FROM users').first();
     const totalLinksRow = await (c.env.DB as any).prepare('SELECT COUNT(*) as cnt FROM links').first();
     const totalClicksRow = await (c.env.DB as any).prepare('SELECT SUM(click_count) as cnt FROM links').first();
+
+    // Users by tier
+    const tierRows = await (c.env.DB as any)
+      .prepare("SELECT tier, COUNT(*) as cnt FROM users GROUP BY tier")
+      .all();
+    const usersByTier: Record<string, number> = {};
+    for (const r of (tierRows?.results || [])) {
+      usersByTier[(r as any).tier || 'unknown'] = Number((r as any).cnt || 0);
+    }
+
+    // Top links by clicks
+    const topLinkRows = await (c.env.DB as any)
+      .prepare('SELECT l.id, l.title, l.original_url, l.short_code, l.click_count, u.name as user_name, u.id as user_id FROM links l LEFT JOIN users u ON l.user_id = u.id ORDER BY l.click_count DESC LIMIT 10')
+      .all();
+    const topLinks = (topLinkRows?.results || []).map((r: any) => ({
+      id: r.id,
+      title: r.title || r.original_url,
+      short_code: r.short_code,
+      click_count: Number(r.click_count || 0),
+      user_name: r.user_name || '',
+      user_id: r.user_id || '',
+    }));
+
+    // Links created per day (for the last N days)
+    const sinceIso = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+    const linkDatesRows = await (c.env.DB as any)
+      .prepare('SELECT substr(created_at, 1, 10) as d, COUNT(*) as cnt FROM links WHERE created_at >= ? GROUP BY substr(created_at,1,10) ORDER BY d ASC')
+      .bind(sinceIso)
+      .all();
+    const linksByDate: Record<string, number> = {};
+    for (const r of (linkDatesRows?.results || [])) {
+      linksByDate[(r as any).d] = Number((r as any).cnt || 0);
+    }
+
+    // clicksByDate from click_events
+    const clicksRows = await (c.env.DB as any)
+      .prepare('SELECT substr(created_at,1,10) as d, COUNT(*) as cnt FROM click_events WHERE created_at >= ? GROUP BY substr(created_at,1,10) ORDER BY d ASC')
+      .bind(sinceIso)
+      .all();
+    const clicksByDate: Record<string, number> = {};
+    for (const r of (clicksRows?.results || [])) {
+      clicksByDate[(r as any).d] = Number((r as any).cnt || 0);
+    }
 
     const overview = {
       totalUsers: Number((totalUsersRow as any)?.cnt || 0),
@@ -1881,13 +1926,30 @@ app.get('/api/admin/analytics/system', adminAuthMiddleware as any, async (c) => 
     };
 
     const revenue = { total: 0, monthly: 0, yearly: 0 };
-    const usersByTier: Record<string, number> = {};
-    const linksByDate: Record<string, number> = {};
-    const clicksByDate: Record<string, number> = {};
-    const topLinks: any[] = [];
+    // Device breakdown
+    const deviceRows = await (c.env.DB as any)
+      .prepare('SELECT device_type, COUNT(*) as cnt FROM click_events WHERE created_at >= ? GROUP BY device_type')
+      .bind(sinceIso)
+      .all();
+    const deviceStats = (deviceRows?.results || []).map((r: any) => ({ device: r.device_type || 'unknown', count: Number(r.cnt || 0) }));
+
+    // Browser breakdown
+    const browserRows = await (c.env.DB as any)
+      .prepare('SELECT browser, COUNT(*) as cnt FROM click_events WHERE created_at >= ? GROUP BY browser')
+      .bind(sinceIso)
+      .all();
+    const browserStats = (browserRows?.results || []).map((r: any) => ({ browser: r.browser || 'unknown', count: Number(r.cnt || 0) }));
+
+    // Country breakdown
+    const countryRows = await (c.env.DB as any)
+      .prepare('SELECT country, COUNT(*) as cnt FROM click_events WHERE created_at >= ? GROUP BY country ORDER BY cnt DESC LIMIT 10')
+      .bind(sinceIso)
+      .all();
+    const countryStats = (countryRows?.results || []).map((r: any) => ({ country: r.country || 'Unknown', count: Number(r.cnt || 0) }));
+
     const recentActivity: any[] = [];
 
-    return c.json({ overview, usersByTier, linksByDate, clicksByDate, topLinks, recentActivity, revenue });
+    return c.json({ overview, usersByTier, linksByDate, clicksByDate, topLinks, recentActivity, revenue, deviceStats, browserStats, countryStats });
   } catch (e) {
     console.error('Admin analytics error:', e);
     return c.json({ error: 'Internal server error' }, 500);
@@ -1951,6 +2013,424 @@ app.get('/api/admin/users/regular', adminAuthMiddleware as any, async (c) => {
     return c.json({ users, total, pagination });
   } catch (e) {
     console.error('Admin users list error:', e);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+// Admin: list admin users
+app.get('/api/admin/users', adminAuthMiddleware as any, async (c) => {
+  try {
+    const rows = await (c.env.DB as any)
+      .prepare('SELECT id, email, name, role, permissions, is_active, last_login_at, created_at FROM admin_users ORDER BY created_at DESC')
+      .all();
+    const adminUsers = (rows?.results || []).map((u: any) => ({
+      id: u.id,
+      email: u.email,
+      name: u.name,
+      role: u.role,
+      permissions: (() => { try { return JSON.parse(u.permissions || '{}') } catch { return {} } })(),
+      is_active: !!u.is_active,
+      last_login_at: u.last_login_at,
+      created_at: u.created_at,
+    }));
+    return c.json({ adminUsers });
+  } catch (e) {
+    console.error('Admin list error:', e);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+// Admin: create admin user
+app.post('/api/admin/users', adminAuthMiddleware as any, async (c) => {
+  try {
+    const body = await c.req.json();
+    const { email, name, password, role, permissions } = body || {};
+    if (!email || !name || !password || !role) {
+      return c.json({ error: 'Missing required fields' }, 400);
+    }
+    const id = crypto.randomUUID();
+    const permsJson = JSON.stringify(permissions || {});
+    // For consistency with current verification, use SHA-256
+    const encoder = new TextEncoder();
+    const pwdHashBuf = await crypto.subtle.digest('SHA-256', encoder.encode(password));
+    const pwdHash = Array.from(new Uint8Array(pwdHashBuf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+    const now = new Date().toISOString();
+    await (c.env.DB as any)
+      .prepare('INSERT INTO admin_users (id, email, name, password_hash, role, permissions, is_active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)')
+      .bind(id, email, name, pwdHash, role, permsJson, now, now)
+      .run();
+    return c.json({ adminUser: { id, email, name, role, permissions: permissions || {}, is_active: true, created_at: now } });
+  } catch (e) {
+    console.error('Create admin error:', e);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+// Admin: update admin user
+app.put('/api/admin/users/:id', adminAuthMiddleware as any, async (c) => {
+  try {
+    const id = c.req.param('id');
+    const body = await c.req.json();
+    const { name, role, permissions, isActive } = body || {};
+    const fields: string[] = [];
+    const params: any[] = [];
+    if (name !== undefined) { fields.push('name = ?'); params.push(name); }
+    if (role !== undefined) { fields.push('role = ?'); params.push(role); }
+    if (permissions !== undefined) { fields.push('permissions = ?'); params.push(JSON.stringify(permissions)); }
+    if (isActive !== undefined) { fields.push('is_active = ?'); params.push(!!isActive ? 1 : 0); }
+    fields.push('updated_at = ?'); params.push(new Date().toISOString());
+    params.push(id);
+    await (c.env.DB as any)
+      .prepare(`UPDATE admin_users SET ${fields.join(', ')} WHERE id = ?`)
+      .bind(...params)
+      .run();
+    const row = await (c.env.DB as any)
+      .prepare('SELECT id, email, name, role, permissions, is_active, last_login_at, created_at FROM admin_users WHERE id = ?')
+      .bind(id)
+      .first();
+    const adminUser = row ? {
+      id: (row as any).id,
+      email: (row as any).email,
+      name: (row as any).name,
+      role: (row as any).role,
+      permissions: (()=>{ try { return JSON.parse((row as any).permissions||'{}') } catch { return {} } })(),
+      is_active: !!(row as any).is_active,
+      last_login_at: (row as any).last_login_at,
+      created_at: (row as any).created_at,
+    } : null;
+    return c.json({ adminUser });
+  } catch (e) {
+    console.error('Update admin error:', e);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+// Admin: delete admin user
+app.delete('/api/admin/users/:id', adminAuthMiddleware as any, async (c) => {
+  try {
+    const id = c.req.param('id');
+    await (c.env.DB as any).prepare('DELETE FROM admin_users WHERE id = ?').bind(id).run();
+    return c.json({ success: true });
+  } catch (e) {
+    console.error('Delete admin error:', e);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+// Admin: links list
+app.get('/api/admin/links', adminAuthMiddleware as any, async (c) => {
+  try {
+    const limit = Math.max(1, Math.min(100, parseInt((c.req.query('limit') as string) || '50')));
+    const offset = Math.max(0, parseInt((c.req.query('offset') as string) || '0'));
+    const search = (c.req.query('search') as string) || '';
+    const userId = (c.req.query('userId') as string) || '';
+
+    let base = 'FROM links l LEFT JOIN users u ON l.user_id = u.id WHERE 1=1';
+    const params: any[] = [];
+    if (search) {
+      base += ' AND (LOWER(l.title) LIKE ? OR LOWER(l.original_url) LIKE ? OR LOWER(l.short_code) LIKE ?)';
+      params.push(`%${search.toLowerCase()}%`, `%${search.toLowerCase()}%`, `%${search.toLowerCase()}%`);
+    }
+    if (userId) {
+      base += ' AND l.user_id = ?';
+      params.push(userId);
+    }
+
+    const totalRow = await (c.env.DB as any).prepare(`SELECT COUNT(*) as cnt ${base}`).bind(...params).first();
+    const total = Number((totalRow as any)?.cnt || 0);
+
+    const rows = await (c.env.DB as any)
+      .prepare(`SELECT l.*, u.name as user_name, u.email as user_email ${base} ORDER BY l.created_at DESC LIMIT ? OFFSET ?`)
+      .bind(...params, limit, offset)
+      .all();
+
+    const links = (rows?.results || []).map((r: any) => ({
+      id: r.id,
+      user_id: r.user_id,
+      user_name: r.user_name,
+      user_email: r.user_email,
+      original_url: r.original_url,
+      short_code: r.short_code,
+      custom_domain: r.custom_domain,
+      title: r.title,
+      description: r.description,
+      is_active: !!r.is_active,
+      expires_at: r.expires_at,
+      click_count: Number(r.click_count || 0),
+      created_at: r.created_at,
+      updated_at: r.updated_at,
+      last_clicked: null,
+    }));
+
+    const pagination = { limit, offset, hasMore: offset + links.length < total };
+    return c.json({ links, total, pagination });
+  } catch (e) {
+    console.error('Admin links list error:', e);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+// Admin: update link
+app.put('/api/admin/links/:id', adminAuthMiddleware as any, async (c) => {
+  try {
+    const id = c.req.param('id');
+    const body = await c.req.json();
+    const { title, isActive, expiresAt } = body || {};
+    const fields: string[] = [];
+    const params: any[] = [];
+    if (title !== undefined) { fields.push('title = ?'); params.push(title); }
+    if (isActive !== undefined) { fields.push('is_active = ?'); params.push(!!isActive ? 1 : 0); }
+    if (expiresAt !== undefined) { fields.push('expires_at = ?'); params.push(expiresAt); }
+    fields.push('updated_at = ?'); params.push(new Date().toISOString());
+    params.push(id);
+    await (c.env.DB as any)
+      .prepare(`UPDATE links SET ${fields.join(', ')} WHERE id = ?`)
+      .bind(...params)
+      .run();
+    const row = await (c.env.DB as any)
+      .prepare('SELECT * FROM links WHERE id = ?')
+      .bind(id)
+      .first();
+    return c.json({ link: row });
+  } catch (e) {
+    console.error('Admin link update error:', e);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+// Admin: delete link
+app.delete('/api/admin/links/:id', adminAuthMiddleware as any, async (c) => {
+  try {
+    const id = c.req.param('id');
+    await (c.env.DB as any).prepare('DELETE FROM links WHERE id = ?').bind(id).run();
+    return c.json({ success: true });
+  } catch (e) {
+    console.error('Admin link delete error:', e);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+// Admin: subscriptions summary from users table
+app.get('/api/admin/subscriptions', adminAuthMiddleware as any, async (c) => {
+  try {
+    const limit = Math.max(1, Math.min(200, parseInt((c.req.query('limit') as string) || '100')));
+    const offset = Math.max(0, parseInt((c.req.query('offset') as string) || '0'));
+    const status = (c.req.query('status') as string) || '';
+
+    let base = 'FROM users WHERE 1=1';
+    const params: any[] = [];
+    if (status) {
+      base += ' AND subscription_status = ?';
+      params.push(status);
+    }
+
+    const totalRow = await (c.env.DB as any).prepare(`SELECT COUNT(*) as cnt ${base}`).bind(...params).first();
+    const total = Number((totalRow as any)?.cnt || 0);
+
+    const rows = await (c.env.DB as any)
+      .prepare(
+        `SELECT id, name, email, tier, subscription_status, current_period_start, current_period_end, cancel_at_period_end ${base} ORDER BY current_period_end DESC LIMIT ? OFFSET ?`
+      )
+      .bind(...params, limit, offset)
+      .all();
+
+    const subscriptions = (rows?.results || []).map((u: any) => ({
+      id: `sub_${u.id}`,
+      user_id: u.id,
+      user_name: u.name,
+      user_email: u.email,
+      plan_id: u.tier,
+      plan_name: u.tier,
+      tier: u.tier,
+      status: u.subscription_status,
+      billing_cycle: 'monthly',
+      amount: 0,
+      currency: 'ETB',
+      current_period_start: u.current_period_start,
+      current_period_end: u.current_period_end,
+      cancel_at_period_end: !!u.cancel_at_period_end,
+      created_at: u.current_period_start,
+      updated_at: u.current_period_end,
+    }));
+
+    // Basic revenue aggregates (0 until payment rows are integrated)
+    const revenue = { total: 0, monthly: 0, yearly: 0 };
+    return c.json({ subscriptions, total, revenue });
+  } catch (e) {
+    console.error('Admin subscriptions error:', e);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+// Admin: payment transactions list
+app.get('/api/admin/transactions', adminAuthMiddleware as any, async (c) => {
+  try {
+    const limit = Math.max(1, Math.min(200, parseInt((c.req.query('limit') as string) || '100')));
+    const offset = Math.max(0, parseInt((c.req.query('offset') as string) || '0'));
+    const status = (c.req.query('status') as string) || '';
+
+    let base = 'FROM payment_transactions t LEFT JOIN users u ON t.user_id = u.id LEFT JOIN subscription_plans p ON t.plan_id = p.id WHERE 1=1';
+    const params: any[] = [];
+    if (status) {
+      base += ' AND t.status = ?';
+      params.push(status);
+    }
+
+    const totalRow = await (c.env.DB as any).prepare(`SELECT COUNT(*) as cnt ${base}`).bind(...params).first();
+    const total = Number((totalRow as any)?.cnt || 0);
+
+    const rows = await (c.env.DB as any)
+      .prepare(`SELECT t.*, u.name as user_name, u.email as user_email, COALESCE(p.name, t.plan_id) as plan_name ${base} ORDER BY t.created_at DESC LIMIT ? OFFSET ?`)
+      .bind(...params, limit, offset)
+      .all();
+
+    const transactions = (rows?.results || []).map((r: any) => ({
+      id: r.id,
+      user_id: r.user_id,
+      user_name: r.user_name || '',
+      user_email: r.user_email || '',
+      plan_name: r.plan_name || r.plan_id,
+      tx_ref: r.tx_ref,
+      ref_id: (r as any).ref_id,
+      amount: Number(r.amount || 0),
+      currency: r.currency || 'ETB',
+      billing_cycle: r.billing_cycle,
+      status: r.status,
+      created_at: r.created_at,
+      updated_at: r.updated_at,
+    }));
+
+    return c.json({ transactions, total, pagination: { limit, offset, hasMore: offset + transactions.length < total } });
+  } catch (e) {
+    console.error('Admin transactions error:', e);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+// Admin: refund transaction (logical)
+app.post('/api/admin/transactions/:id/refund', adminAuthMiddleware as any, async (c) => {
+  try {
+    const id = c.req.param('id');
+    // For now, mark as 'cancelled' if currently 'success' or 'pending'
+    const row = await (c.env.DB as any).prepare('SELECT status FROM payment_transactions WHERE id = ?').bind(id).first();
+    if (!row) return c.json({ error: 'Transaction not found' }, 404);
+    const current = (row as any).status as string;
+    const nextStatus = current === 'success' || current === 'pending' ? 'cancelled' : current;
+    const now = new Date().toISOString();
+    await (c.env.DB as any)
+      .prepare('UPDATE payment_transactions SET status = ?, updated_at = ? WHERE id = ?')
+      .bind(nextStatus, now, id)
+      .run();
+    const updated = await (c.env.DB as any)
+      .prepare('SELECT * FROM payment_transactions WHERE id = ?')
+      .bind(id)
+      .first();
+    return c.json({ transaction: updated });
+  } catch (e) {
+    console.error('Admin refund error:', e);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+// Admin: verify payment with Chapa by tx_ref (our initial transaction reference)
+app.post('/api/admin/transactions/:txRef/verify', adminAuthMiddleware as any, async (c) => {
+  try {
+    const txRef = c.req.param('txRef');
+    if (!txRef) return c.json({ error: 'txRef required' }, 400);
+    
+    console.log('Verifying tx_ref:', txRef);
+    
+    // First, let's see what tx_refs are available in the database
+    const allRefs = await (c.env.DB as any).prepare('SELECT ref_id, tx_ref, status FROM payment_transactions WHERE tx_ref IS NOT NULL LIMIT 10').all();
+    console.log('Available tx_refs in database:', allRefs?.results || []);
+
+    const secret = (c.env as any).CHAPA_SECRET_KEY;
+    if (!secret) {
+      console.error('CHAPA_SECRET_KEY not configured. Available env vars:', Object.keys(c.env));
+      return c.json({ error: 'Chapa secret key not configured. Please set CHAPA_SECRET_KEY environment variable.' }, 500);
+    }
+
+    // According to Chapa documentation: GET https://api.chapa.co/v1/transaction/verify/<tx_ref>
+    const chapaUrl = `https://api.chapa.co/v1/transaction/verify/${txRef}`;
+    console.log('Calling Chapa API:', chapaUrl);
+    
+    const chapaRes = await fetch(chapaUrl, {
+      method: 'GET',
+      headers: { 
+        'Authorization': `Bearer ${secret}`,
+        'Content-Type': 'application/json'
+      },
+    });
+    
+    console.log('Chapa response status:', chapaRes.status, chapaRes.statusText);
+    
+    const data: any = await chapaRes.json().catch((e) => {
+      console.error('Failed to parse Chapa response:', e);
+      return { error: 'Invalid JSON response from Chapa' };
+    });
+    
+    console.log('Chapa response data:', data);
+    
+    if (!chapaRes.ok) {
+      console.error('Chapa API error:', { 
+        status: chapaRes.status, 
+        statusText: chapaRes.statusText, 
+        data,
+        url: chapaUrl,
+        txRef: txRef,
+        secretKeyPrefix: secret.substring(0, 10) + '...'
+      });
+      
+      // Provide more specific error messages based on Chapa's response
+      let errorMessage = 'Chapa verify failed';
+      if (data?.message) {
+        errorMessage = data.message;
+      } else if (chapaRes.status === 404) {
+        errorMessage = 'Transaction reference not found in Chapa system';
+      } else if (chapaRes.status === 401) {
+        errorMessage = 'Invalid Chapa API key';
+      } else if (chapaRes.status === 403) {
+        errorMessage = 'Access denied - check API key permissions';
+      }
+      
+      return c.json({ 
+        error: errorMessage, 
+        details: data,
+        status: chapaRes.status,
+        statusText: chapaRes.statusText,
+        url: chapaUrl,
+        txRef: txRef
+      });
+    }
+
+    // Expected Chapa response: { status: 'success', data: { ... } }
+    const chapaStatus = ((data && (data as any).status) || '').toLowerCase();
+    const newStatus = chapaStatus === 'success' ? 'success' : chapaStatus === 'failed' ? 'failed' : chapaStatus === 'cancelled' ? 'cancelled' : undefined;
+
+    console.log('Chapa status:', chapaStatus, 'New status:', newStatus);
+
+    // Load txn by tx_ref (our system's reference)
+    const row = await (c.env.DB as any).prepare('SELECT * FROM payment_transactions WHERE tx_ref = ?').bind(txRef).first();
+    if (!row) {
+      // Check if any transactions exist with tx_ref
+      const allRefs = await (c.env.DB as any).prepare('SELECT ref_id, tx_ref FROM payment_transactions WHERE tx_ref IS NOT NULL LIMIT 5').all();
+      console.log('Available tx_refs:', allRefs?.results || []);
+      return c.json({ error: 'Transaction not found', availableRefs: allRefs?.results || [] }, 404);
+    }
+
+    const now = new Date().toISOString();
+    if (newStatus) {
+      await (c.env.DB as any)
+        .prepare('UPDATE payment_transactions SET status = ?, updated_at = ? WHERE tx_ref = ?')
+        .bind(newStatus, now, txRef)
+        .run();
+      console.log('Updated transaction status to:', newStatus);
+    }
+
+    const updated = await (c.env.DB as any).prepare('SELECT * FROM payment_transactions WHERE tx_ref = ?').bind(txRef).first();
+    return c.json({ transaction: updated, chapa: data });
+  } catch (e) {
+    console.error('Admin verify error:', e);
     return c.json({ error: 'Internal server error' }, 500);
   }
 });
@@ -2513,20 +2993,18 @@ app.get('/:shortCode', async (c) => {
 
     const { device_type, browser, os } = parseUserAgent(userAgent);
 
-    // Create analytics event
+    // Create click event (for admin analytics)
     await c.env.DB.prepare(`
-      INSERT INTO analytics_events (id, link_id, ip_address, user_agent, referer, country, device_type, browser, os)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO click_events (id, link_id, user_id, country, device_type, browser, referrer)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
     `).bind(
       generateId(),
       link.id,
-      ip,
-      userAgent,
-      referer,
-      country,
-      device_type,
-      browser,
-      os
+      link.user_id,
+      country || null,
+      device_type || null,
+      browser || null,
+      referer || null
     ).run();
 
     // Increment click count
