@@ -20,6 +20,7 @@ interface DashboardStats {
 
 export default function AdminDashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null)
+  const [recentUsers, setRecentUsers] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
@@ -35,11 +36,12 @@ export default function AdminDashboardPage() {
         totalClicks: res.overview.totalClicks,
         totalRevenue: Math.round(res.revenue?.total || 0),
         activeSubscriptions: res.overview.activeUsers,
-        pendingPayments: 0,
+        pendingPayments: res.pendingPayments || 0,
         recentActivity: res.recentActivity?.length || 0,
         systemHealth: "healthy",
       }
       setStats(mapped)
+      setRecentUsers(res.recentUsers || [])
     } catch (error) {
       console.error("Failed to fetch dashboard stats:", error)
     } finally {
@@ -214,10 +216,10 @@ export default function AdminDashboardPage() {
             <CardTitle className="text-sm font-medium">Quick Actions</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
-            <Button size="sm" className="w-full">
+            <Button size="sm" className="w-full" onClick={() => window.location.href = '/admin/analytics'}>
               View Reports
             </Button>
-            <Button size="sm" variant="outline" className="w-full bg-transparent">
+            <Button size="sm" variant="outline" className="w-full bg-transparent" onClick={() => window.location.href = '/admin/settings'}>
               System Settings
             </Button>
           </CardContent>
@@ -233,54 +235,49 @@ export default function AdminDashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {[
-                { name: "John Doe", email: "john@example.com", tier: "pro", time: "2 hours ago" },
-                { name: "Jane Smith", email: "jane@example.com", tier: "free", time: "4 hours ago" },
-                { name: "Bob Wilson", email: "bob@example.com", tier: "premium", time: "6 hours ago" },
-              ].map((user, i) => (
-                <div key={i} className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium">{user.name}</p>
-                    <p className="text-xs text-muted-foreground">{user.email}</p>
+              {recentUsers.length > 0 ? (
+                recentUsers.map((user, i) => (
+                  <div key={user.id} className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium">{user.name}</p>
+                      <p className="text-xs text-muted-foreground">{user.email}</p>
+                    </div>
+                    <div className="text-right">
+                      <Badge variant="outline">{user.tier}</Badge>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {new Date(user.created_at).toLocaleDateString()}
+                      </p>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <Badge variant="outline">{user.tier}</Badge>
-                    <p className="text-xs text-muted-foreground mt-1">{user.time}</p>
-                  </div>
+                ))
+              ) : (
+                <div className="text-center py-4 text-muted-foreground">
+                  <p className="text-sm">No recent registrations</p>
                 </div>
-              ))}
+              )}
             </div>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle>System Alerts</CardTitle>
-            <CardDescription>Important notifications and warnings</CardDescription>
+            <CardTitle>Recent Activity</CardTitle>
+            <CardDescription>Latest system activities and events</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              <div className="flex items-start gap-3">
-                <CheckCircle className="h-4 w-4 text-green-500 mt-0.5" />
-                <div>
-                  <p className="text-sm font-medium">Database backup completed</p>
-                  <p className="text-xs text-muted-foreground">Automated backup finished successfully</p>
+              {stats?.recentActivity && stats.recentActivity > 0 ? (
+                <div className="text-center">
+                  <Activity className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                  <p className="text-sm font-medium">{stats.recentActivity} activities in the last 24 hours</p>
+                  <p className="text-xs text-muted-foreground">System is running smoothly</p>
                 </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <AlertTriangle className="h-4 w-4 text-yellow-500 mt-0.5" />
-                <div>
-                  <p className="text-sm font-medium">High API usage detected</p>
-                  <p className="text-xs text-muted-foreground">Monitor rate limits for user ID: 12345</p>
+              ) : (
+                <div className="text-center py-4 text-muted-foreground">
+                  <Activity className="h-8 w-8 mx-auto mb-2" />
+                  <p className="text-sm">No recent activity</p>
                 </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <CheckCircle className="h-4 w-4 text-green-500 mt-0.5" />
-                <div>
-                  <p className="text-sm font-medium">Payment webhook healthy</p>
-                  <p className="text-xs text-muted-foreground">Chapa integration working normally</p>
-                </div>
-              </div>
+              )}
             </div>
           </CardContent>
         </Card>

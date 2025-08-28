@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
+import { adminApi } from "@/lib/admin-api"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -34,14 +35,8 @@ export function AdminHeader() {
 
   const fetchAdminUser = async () => {
     try {
-      const response = await fetch("/api/admin/auth/me")
-      if (response.ok) {
-        const data = await response.json()
-        setAdmin(data.admin)
-      } else {
-        // Redirect to login if not authenticated
-        router.push("/admin/login")
-      }
+      const response = await adminApi.getMe()
+      setAdmin(response.adminUser)
     } catch (error) {
       console.error("Failed to fetch admin user:", error)
       router.push("/admin/login")
@@ -52,7 +47,7 @@ export function AdminHeader() {
 
   const handleLogout = async () => {
     try {
-      await fetch("/api/admin/auth/logout", { method: "POST" })
+      await adminApi.logout()
       router.push("/admin/login")
     } catch (error) {
       console.error("Logout error:", error)

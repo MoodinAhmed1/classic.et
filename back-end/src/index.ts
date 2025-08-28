@@ -6,7 +6,7 @@ import { cors } from 'hono/cors';
 import { jwt, sign, verify } from 'hono/jwt';
 import { setCookie, getCookie } from 'hono/cookie';
 import { UAParser } from 'ua-parser-js';
-import { adminAuthMiddleware, requirePermission, getAdminByEmail, updateAdminLastLogin } from './admin-auth';
+import { adminAuthMiddleware, requirePermission, getAdminByEmail, updateAdminLastLogin, verifyAdminPassword, hashAdminPasswordPBKDF2 } from './admin-auth';
 import { 
   checkUsageLimit, 
   incrementUsage, 
@@ -73,6 +73,7 @@ app.use('*', async (c, next) => {
   const origin = c.req.header('Origin') || '';
   const allowedOrigins = [
     'http://localhost:3000',
+    'http://localhost:3001',
     'https://your-frontend-domain.com', // Replace with your actual frontend domain
     'https://linkshort.vercel.app' // Example production domain
   ];
@@ -1804,7 +1805,12 @@ app.post('/api/admin/auth/login', async (c) => {
       .prepare('SELECT password_hash FROM admin_users WHERE id = ?')
       .bind((admin as any).id)
       .first();
-    if (!row || !(await verifyPassword(password, (row as any).password_hash))) {
+    if (!row) {
+      return c.json({ error: 'Invalid credentials' }, 401);
+    }
+    
+    const passwordCheck = await verifyAdminPassword(password, (row as any).password_hash);
+    if (!passwordCheck.valid) {
       return c.json({ error: 'Invalid credentials' }, 401);
     }
 
@@ -1918,14 +1924,71 @@ app.get('/api/admin/analytics/system', adminAuthMiddleware as any, async (c) => 
       clicksByDate[(r as any).d] = Number((r as any).cnt || 0);
     }
 
+    // Calculate active users (users with subscription_status = 'active')
+    const activeUsersRow = await (c.env.DB as any)
+      .prepare("SELECT COUNT(*) as cnt FROM users WHERE subscription_status = 'active'")
+      .first();
+
+    // Calculate revenue from payment transactions
+    const revenueRows = await (c.env.DB as any)
+      .prepare("SELECT SUM(amount) as total FROM payment_transactions WHERE status = 'success'")
+      .first();
+    
+    const monthlyRevenueRows = await (c.env.DB as any)
+      .prepare("SELECT SUM(amount) as total FROM payment_transactions WHERE status = 'success' AND created_at >= datetime('now', '-30 days')")
+      .first();
+
+    // Calculate pending payments
+    const pendingPaymentsRow = await (c.env.DB as any)
+      .prepare("SELECT COUNT(*) as cnt FROM payment_transactions WHERE status = 'pending'")
+      .first();
+
+    // Get recent user registrations
+    const recentUsersRows = await (c.env.DB as any)
+      .prepare("SELECT id, name, email, tier, created_at FROM users ORDER BY created_at DESC LIMIT 5")
+      .all();
+
+    const recentUsers = (recentUsersRows?.results || []).map((r: any) => ({
+      id: r.id,
+      name: r.name || 'Unknown',
+      email: r.email,
+      tier: r.tier,
+      created_at: r.created_at
+    }));
+
+    // Get recent activity (click events)
+    const recentActivityRows = await (c.env.DB as any)
+      .prepare(`
+        SELECT ce.id, ce.created_at, l.short_code, l.title, u.name as user_name, u.email as user_email
+        FROM click_events ce
+        LEFT JOIN links l ON ce.link_id = l.id
+        LEFT JOIN users u ON ce.user_id = u.id
+        ORDER BY ce.created_at DESC LIMIT 10
+      `)
+      .all();
+
+    const recentActivity = (recentActivityRows?.results || []).map((r: any) => ({
+      id: r.id,
+      type: 'click',
+      description: `Click on ${r.title || r.short_code} by ${r.user_name || r.user_email}`,
+      created_at: r.created_at,
+      user_name: r.user_name,
+      link_title: r.title || r.short_code
+    }));
+
     const overview = {
       totalUsers: Number((totalUsersRow as any)?.cnt || 0),
       totalLinks: Number((totalLinksRow as any)?.cnt || 0),
       totalClicks: Number((totalClicksRow as any)?.cnt || 0),
-      activeUsers: 0,
+      activeUsers: Number((activeUsersRow as any)?.cnt || 0),
     };
 
-    const revenue = { total: 0, monthly: 0, yearly: 0 };
+    const revenue = { 
+      total: Number((revenueRows as any)?.total || 0), 
+      monthly: Number((monthlyRevenueRows as any)?.total || 0), 
+      yearly: 0 
+    };
+
     // Device breakdown
     const deviceRows = await (c.env.DB as any)
       .prepare('SELECT device_type, COUNT(*) as cnt FROM click_events WHERE created_at >= ? GROUP BY device_type')
@@ -1947,9 +2010,20 @@ app.get('/api/admin/analytics/system', adminAuthMiddleware as any, async (c) => 
       .all();
     const countryStats = (countryRows?.results || []).map((r: any) => ({ country: r.country || 'Unknown', count: Number(r.cnt || 0) }));
 
-    const recentActivity: any[] = [];
-
-    return c.json({ overview, usersByTier, linksByDate, clicksByDate, topLinks, recentActivity, revenue, deviceStats, browserStats, countryStats });
+    return c.json({ 
+      overview, 
+      usersByTier, 
+      linksByDate, 
+      clicksByDate, 
+      topLinks, 
+      recentActivity, 
+      recentUsers,
+      revenue, 
+      deviceStats, 
+      browserStats, 
+      countryStats,
+      pendingPayments: Number((pendingPaymentsRow as any)?.cnt || 0)
+    });
   } catch (e) {
     console.error('Admin analytics error:', e);
     return c.json({ error: 'Internal server error' }, 500);
@@ -2050,10 +2124,8 @@ app.post('/api/admin/users', adminAuthMiddleware as any, async (c) => {
     }
     const id = crypto.randomUUID();
     const permsJson = JSON.stringify(permissions || {});
-    // For consistency with current verification, use SHA-256
-    const encoder = new TextEncoder();
-    const pwdHashBuf = await crypto.subtle.digest('SHA-256', encoder.encode(password));
-    const pwdHash = Array.from(new Uint8Array(pwdHashBuf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+    // Use admin-specific password hashing
+    const pwdHash = await hashAdminPasswordPBKDF2(password);
     const now = new Date().toISOString();
     await (c.env.DB as any)
       .prepare('INSERT INTO admin_users (id, email, name, password_hash, role, permissions, is_active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)')
@@ -3765,6 +3837,174 @@ app.get('/api/webhooks/chapa', async (c) => {
   } catch (error) {
     console.error('Chapa callback handler error:', error);
     return c.json({ error: 'Callback error' }, 400);
+  }
+});
+
+// Admin: create regular user
+app.post('/api/admin/users/regular', adminAuthMiddleware as any, async (c) => {
+  try {
+    const body = await c.req.json();
+    const { email, name, password, tier } = body || {};
+    
+    if (!email || !name || !password || !tier) {
+      return c.json({ error: 'Missing required fields' }, 400);
+    }
+
+    // Check if user already exists
+    const existingUser = await c.env.DB.prepare(
+      'SELECT id FROM users WHERE email = ?'
+    ).bind(email).first();
+
+    if (existingUser) {
+      return c.json({ error: 'User already exists' }, 409);
+    }
+
+    // Create user
+    const userId = generateId();
+    const passwordHash = await hashPassword(password);
+    const now = new Date().toISOString();
+
+    await c.env.DB.prepare(`
+      INSERT INTO users (id, email, name, password_hash, tier, subscription_status, email_verified, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, 'active', 1, ?, ?)
+    `).bind(userId, email, name, passwordHash, tier, now, now).run();
+
+    const newUser = await c.env.DB.prepare(`
+      SELECT id, email, name, tier, subscription_status, email_verified, created_at, updated_at
+      FROM users WHERE id = ?
+    `).bind(userId).first() as any;
+
+    return c.json({ 
+      user: {
+        id: newUser.id,
+        email: newUser.email,
+        name: newUser.name,
+        tier: newUser.tier,
+        subscription_status: newUser.subscription_status,
+        email_verified: !!newUser.email_verified,
+        created_at: newUser.created_at,
+        updated_at: newUser.updated_at
+      }
+    });
+  } catch (e) {
+    console.error('Create user error:', e);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+// Admin: update regular user
+app.put('/api/admin/users/regular/:id', adminAuthMiddleware as any, async (c) => {
+  try {
+    const id = c.req.param('id');
+    const body = await c.req.json();
+    const { name, email, tier, subscriptionStatus } = body || {};
+    
+    const fields: string[] = [];
+    const params: any[] = [];
+    
+    if (name !== undefined) { fields.push('name = ?'); params.push(name); }
+    if (email !== undefined) { fields.push('email = ?'); params.push(email); }
+    if (tier !== undefined) { fields.push('tier = ?'); params.push(tier); }
+    if (subscriptionStatus !== undefined) { fields.push('subscription_status = ?'); params.push(subscriptionStatus); }
+    
+    fields.push('updated_at = ?'); 
+    params.push(new Date().toISOString());
+    params.push(id);
+
+    await c.env.DB.prepare(`UPDATE users SET ${fields.join(', ')} WHERE id = ?`).bind(...params).run();
+
+    const updatedUser = await c.env.DB.prepare(`
+      SELECT id, email, name, tier, subscription_status, email_verified, created_at, updated_at
+      FROM users WHERE id = ?
+    `).bind(id).first() as any;
+
+    if (!updatedUser) {
+      return c.json({ error: 'User not found' }, 404);
+    }
+
+    return c.json({ 
+      user: {
+        id: updatedUser.id,
+        email: updatedUser.email,
+        name: updatedUser.name,
+        tier: updatedUser.tier,
+        subscription_status: updatedUser.subscription_status,
+        email_verified: !!updatedUser.email_verified,
+        created_at: updatedUser.created_at,
+        updated_at: updatedUser.updated_at
+      }
+    });
+  } catch (e) {
+    console.error('Update user error:', e);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+// Admin: delete regular user
+app.delete('/api/admin/users/regular/:id', adminAuthMiddleware as any, async (c) => {
+  try {
+    const id = c.req.param('id');
+    
+    // Delete user's links first
+    await c.env.DB.prepare('DELETE FROM links WHERE user_id = ?').bind(id).run();
+    
+    // Delete user's payment transactions
+    await c.env.DB.prepare('DELETE FROM payment_transactions WHERE user_id = ?').bind(id).run();
+    
+    // Delete user's email verifications
+    await c.env.DB.prepare('DELETE FROM email_verifications WHERE user_id = ?').bind(id).run();
+    
+    // Delete user's password resets
+    await c.env.DB.prepare('DELETE FROM password_resets WHERE user_id = ?').bind(id).run();
+    
+    // Delete user's click events
+    await c.env.DB.prepare('DELETE FROM click_events WHERE user_id = ?').bind(id).run();
+    
+    // Finally delete the user
+    await c.env.DB.prepare('DELETE FROM users WHERE id = ?').bind(id).run();
+    
+    return c.json({ success: true });
+  } catch (e) {
+    console.error('Delete user error:', e);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+// Admin: get user by ID
+app.get('/api/admin/users/regular/:id', adminAuthMiddleware as any, async (c) => {
+  try {
+    const id = c.req.param('id');
+    
+    const user = await c.env.DB.prepare(`
+      SELECT id, email, name, tier, subscription_status, email_verified, created_at, updated_at
+      FROM users WHERE id = ?
+    `).bind(id).first() as any;
+
+    if (!user) {
+      return c.json({ error: 'User not found' }, 404);
+    }
+
+    // Get user's link count
+    const linkCount = await c.env.DB.prepare(`
+      SELECT COUNT(*) as count FROM links WHERE user_id = ?
+    `).bind(id).first() as any;
+
+    return c.json({ 
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        tier: user.tier,
+        subscription_status: user.subscription_status,
+        email_verified: !!user.email_verified,
+        created_at: user.created_at,
+        updated_at: user.updated_at,
+        links_count: Number(linkCount?.count || 0)
+      }
+    });
+  } catch (e) {
+    console.error('Get user error:', e);
+    return c.json({ error: 'Internal server error' }, 500);
   }
 });
 

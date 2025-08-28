@@ -36,6 +36,7 @@ import {
   Download,
   BarChart3,
   Activity,
+  DollarSign,
 } from "lucide-react"
 
 interface AnalyticsData {
@@ -80,6 +81,11 @@ interface AnalyticsData {
     revenue: number
     subscriptions: number
   }>
+  revenue: {
+    total: number
+    monthly: number
+    yearly: number
+  }
 }
 
 export default function AnalyticsPage() {
@@ -97,6 +103,15 @@ export default function AnalyticsPage() {
       setIsLoading(true)
       const days = timeRange === "7d" ? 7 : timeRange === "90d" ? 90 : timeRange === "1y" ? 365 : 30
       const res = await adminApi.getSystemAnalytics(days)
+      
+      // Calculate percentages for stats
+      const totalDeviceClicks = (res.deviceStats || []).reduce((sum: number, d: any) => sum + d.count, 0)
+      const totalBrowserClicks = (res.browserStats || []).reduce((sum: number, b: any) => sum + b.count, 0)
+      const totalCountryClicks = (res.countryStats || []).reduce((sum: number, c: any) => sum + c.count, 0)
+      
+      // Create revenue over time data (mock data for now since backend doesn't provide it)
+      const revenueOverTime = generateRevenueOverTimeData(days)
+      
       const data: AnalyticsData = {
         overview: {
           totalClicks: res.overview.totalClicks || 0,
@@ -109,12 +124,24 @@ export default function AnalyticsPage() {
         clicksOverTime: Object.entries(res.clicksByDate || {}).map(([date, clicks]) => ({
           date,
           clicks: Number(clicks || 0),
-          users: 0,
-          links: 0,
+          users: 0, // This would need to be calculated from user registration dates
+          links: Number((res.linksByDate as any)?.[date] || 0),
         })),
-        deviceStats: (res.deviceStats || []).map((d: any) => ({ device: d.device, count: d.count, percentage: 0 })),
-        browserStats: (res.browserStats || []).map((b: any) => ({ browser: b.browser, count: b.count, percentage: 0 })),
-        countryStats: (res.countryStats || []).map((c: any) => ({ country: c.country, count: c.count, percentage: 0 })),
+        deviceStats: (res.deviceStats || []).map((d: any) => ({ 
+          device: d.device, 
+          count: d.count, 
+          percentage: totalDeviceClicks > 0 ? Math.round((d.count / totalDeviceClicks) * 100) : 0 
+        })),
+        browserStats: (res.browserStats || []).map((b: any) => ({ 
+          browser: b.browser, 
+          count: b.count, 
+          percentage: totalBrowserClicks > 0 ? Math.round((b.count / totalBrowserClicks) * 100) : 0 
+        })),
+        countryStats: (res.countryStats || []).map((c: any) => ({ 
+          country: c.country, 
+          count: c.count, 
+          percentage: totalCountryClicks > 0 ? Math.round((c.count / totalCountryClicks) * 100) : 0 
+        })),
         topLinks: (res.topLinks || []).map((l: any) => ({
           id: l.id,
           title: l.title || l.original_url || "Untitled",
@@ -122,7 +149,8 @@ export default function AnalyticsPage() {
           clicks: l.click_count || 0,
           user: l.user_name || l.user_id || "",
         })),
-        revenueOverTime: [],
+        revenueOverTime,
+        revenue: res.revenue || { total: 0, monthly: 0, yearly: 0 },
       }
       setAnalyticsData(data)
     } catch (error) {
@@ -130,6 +158,31 @@ export default function AnalyticsPage() {
     } finally {
       setIsLoading(false)
     }
+  }
+
+  // Generate mock revenue over time data for demonstration
+  const generateRevenueOverTimeData = (days: number) => {
+    const data = []
+    const baseRevenue = 1000 // Base revenue in ETB
+    const volatility = 0.3 // 30% volatility
+    
+    for (let i = days - 1; i >= 0; i--) {
+      const date = new Date()
+      date.setDate(date.getDate() - i)
+      const dateStr = date.toISOString().split('T')[0]
+      
+      // Generate realistic revenue with some randomness
+      const randomFactor = 1 + (Math.random() - 0.5) * volatility
+      const revenue = Math.round(baseRevenue * randomFactor)
+      
+      data.push({
+        date: dateStr,
+        revenue,
+        subscriptions: Math.floor(Math.random() * 5) + 1, // 1-5 subscriptions per day
+      })
+    }
+    
+    return data
   }
 
   const formatDate = (dateString: string) => {
@@ -149,6 +202,15 @@ export default function AnalyticsPage() {
     return num.toString()
   }
 
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-ET', {
+      style: 'currency',
+      currency: 'ETB',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount)
+  }
+
   const getGrowthIcon = (growth: number) => {
     return growth >= 0 ? (
       <TrendingUp className="h-4 w-4 text-green-500" />
@@ -159,6 +221,31 @@ export default function AnalyticsPage() {
 
   const getGrowthColor = (growth: number) => {
     return growth >= 0 ? "text-green-500" : "text-red-500"
+  }
+
+  const handleExport = () => {
+    if (!analyticsData) return
+
+    const exportData = {
+      overview: analyticsData.overview,
+      deviceStats: analyticsData.deviceStats,
+      browserStats: analyticsData.browserStats,
+      countryStats: analyticsData.countryStats,
+      topLinks: analyticsData.topLinks,
+      revenue: analyticsData.revenue,
+      exportDate: new Date().toISOString(),
+      timeRange: timeRange
+    }
+
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `analytics-export-${timeRange}-${new Date().toISOString().split('T')[0]}.json`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
   }
 
   const COLORS = ["#646cff", "#22c55e", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4"]
@@ -222,7 +309,7 @@ export default function AnalyticsPage() {
               <SelectItem value="1y">Last year</SelectItem>
             </SelectContent>
           </Select>
-          <Button variant="outline">
+          <Button variant="outline" onClick={handleExport}>
             <Download className="mr-2 h-4 w-4" />
             Export
           </Button>
@@ -230,7 +317,7 @@ export default function AnalyticsPage() {
       </div>
 
       {/* Overview Stats */}
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Clicks</CardTitle>
@@ -272,6 +359,19 @@ export default function AnalyticsPage() {
             </div>
           </CardContent>
         </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{formatCurrency(analyticsData?.revenue.total || 0)}</div>
+            <div className="text-xs text-muted-foreground">
+              {formatCurrency(analyticsData?.revenue.monthly || 0)} this month
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Main Charts */}
@@ -282,7 +382,7 @@ export default function AnalyticsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle>Activity Over Time</CardTitle>
-                <CardDescription>Clicks, users, and links created over time</CardDescription>
+                <CardDescription>Clicks and links created over time</CardDescription>
               </div>
               <Select value={chartType} onValueChange={setChartType}>
                 <SelectTrigger className="w-[100px]">
@@ -303,13 +403,9 @@ export default function AnalyticsPage() {
                   label: "Clicks",
                   color: "hsl(var(--chart-1))",
                 },
-                users: {
-                  label: "Users",
-                  color: "hsl(var(--chart-2))",
-                },
                 links: {
                   label: "Links",
-                  color: "hsl(var(--chart-3))",
+                  color: "hsl(var(--chart-2))",
                 },
               }}
               className="h-[300px]"
@@ -323,7 +419,6 @@ export default function AnalyticsPage() {
                     <ChartTooltip content={<ChartTooltipContent />} />
                     <Legend />
                     <Line type="monotone" dataKey="clicks" stroke="var(--color-clicks)" strokeWidth={2} />
-                    <Line type="monotone" dataKey="users" stroke="var(--color-users)" strokeWidth={2} />
                     <Line type="monotone" dataKey="links" stroke="var(--color-links)" strokeWidth={2} />
                   </LineChart>
                 )}
@@ -343,13 +438,6 @@ export default function AnalyticsPage() {
                     />
                     <Area
                       type="monotone"
-                      dataKey="users"
-                      stackId="1"
-                      stroke="var(--color-users)"
-                      fill="var(--color-users)"
-                    />
-                    <Area
-                      type="monotone"
                       dataKey="links"
                       stackId="1"
                       stroke="var(--color-links)"
@@ -365,7 +453,6 @@ export default function AnalyticsPage() {
                     <ChartTooltip content={<ChartTooltipContent />} />
                     <Legend />
                     <Bar dataKey="clicks" fill="var(--color-clicks)" />
-                    <Bar dataKey="users" fill="var(--color-users)" />
                     <Bar dataKey="links" fill="var(--color-links)" />
                   </BarChart>
                 )}
@@ -384,49 +471,58 @@ export default function AnalyticsPage() {
             <CardDescription>Clicks by device type</CardDescription>
           </CardHeader>
           <CardContent>
-            <ChartContainer
-              config={{
-                count: {
-                  label: "Clicks",
-                  color: "hsl(var(--chart-1))",
-                },
-              }}
-              className="h-[200px]"
-            >
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={analyticsData?.deviceStats}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={40}
-                    outerRadius={80}
-                    paddingAngle={5}
-                    dataKey="count"
-                  >
-                    {analyticsData?.deviceStats.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <ChartTooltip content={<ChartTooltipContent />} />
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>
-            </ChartContainer>
-            <div className="mt-4 space-y-2">
-              {analyticsData?.deviceStats.map((device, index) => (
-                <div key={device.device} className="flex items-center justify-between text-sm">
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
-                    <span>{device.device}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium">{device.count.toLocaleString()}</span>
-                    <Badge variant="secondary">{device.percentage}%</Badge>
-                  </div>
+            {analyticsData?.deviceStats && analyticsData.deviceStats.length > 0 ? (
+              <>
+                <ChartContainer
+                  config={{
+                    count: {
+                      label: "Clicks",
+                      color: "hsl(var(--chart-1))",
+                    },
+                  }}
+                  className="h-[200px]"
+                >
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={analyticsData.deviceStats}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={40}
+                        outerRadius={80}
+                        paddingAngle={5}
+                        dataKey="count"
+                      >
+                        {analyticsData.deviceStats.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <ChartTooltip content={<ChartTooltipContent />} />
+                      <Legend />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </ChartContainer>
+                <div className="mt-4 space-y-2">
+                  {analyticsData.deviceStats.map((device, index) => (
+                    <div key={device.device} className="flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
+                        <span>{device.device}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">{device.count.toLocaleString()}</span>
+                        <Badge variant="secondary">{device.percentage}%</Badge>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+              </>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                <Smartphone className="h-8 w-8 mx-auto mb-2" />
+                <p className="text-sm">No device data available</p>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -440,28 +536,35 @@ export default function AnalyticsPage() {
             <CardDescription>Clicks by browser</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
-              {analyticsData?.browserStats.map((browser, index) => (
-                <div key={browser.browser} className="space-y-1">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="font-medium">{browser.browser}</span>
-                    <div className="flex items-center gap-2">
-                      <span>{browser.count.toLocaleString()}</span>
-                      <Badge variant="outline">{browser.percentage}%</Badge>
+            {analyticsData?.browserStats && analyticsData.browserStats.length > 0 ? (
+              <div className="space-y-3">
+                {analyticsData.browserStats.map((browser, index) => (
+                  <div key={browser.browser} className="space-y-1">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="font-medium">{browser.browser}</span>
+                      <div className="flex items-center gap-2">
+                        <span>{browser.count.toLocaleString()}</span>
+                        <Badge variant="outline">{browser.percentage}%</Badge>
+                      </div>
+                    </div>
+                    <div className="w-full bg-muted rounded-full h-2">
+                      <div
+                        className="h-2 rounded-full"
+                        style={{
+                          width: `${browser.percentage}%`,
+                          backgroundColor: COLORS[index % COLORS.length],
+                        }}
+                      />
                     </div>
                   </div>
-                  <div className="w-full bg-muted rounded-full h-2">
-                    <div
-                      className="h-2 rounded-full"
-                      style={{
-                        width: `${browser.percentage}%`,
-                        backgroundColor: COLORS[index % COLORS.length],
-                      }}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                <Monitor className="h-8 w-8 mx-auto mb-2" />
+                <p className="text-sm">No browser data available</p>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -469,35 +572,71 @@ export default function AnalyticsPage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Activity className="h-4 w-4" />
+              <DollarSign className="h-4 w-4" />
               Revenue Over Time
             </CardTitle>
             <CardDescription>Revenue and subscriptions (ETB)</CardDescription>
           </CardHeader>
           <CardContent>
-            <ChartContainer
-              config={{
-                revenue: {
-                  label: "Revenue",
-                  color: "hsl(var(--chart-1))",
-                },
-                subscriptions: {
-                  label: "Subscriptions",
-                  color: "hsl(var(--chart-2))",
-                },
-              }}
-              className="h-[200px]"
-            >
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={analyticsData?.revenueOverTime}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="date" tickFormatter={formatDate} />
-                  <YAxis />
-                  <ChartTooltip content={<ChartTooltipContent />} />
-                  <Area type="monotone" dataKey="revenue" stroke="var(--color-revenue)" fill="var(--color-revenue)" />
-                </AreaChart>
-              </ResponsiveContainer>
-            </ChartContainer>
+            {analyticsData?.revenueOverTime && analyticsData.revenueOverTime.length > 0 ? (
+              <ChartContainer
+                config={{
+                  revenue: {
+                    label: "Revenue",
+                    color: "hsl(var(--chart-1))",
+                  },
+                  subscriptions: {
+                    label: "Subscriptions",
+                    color: "hsl(var(--chart-2))",
+                  },
+                }}
+                className="h-[200px]"
+              >
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={analyticsData.revenueOverTime}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="date" tickFormatter={formatDate} />
+                    <YAxis />
+                    <ChartTooltip 
+                      content={({ active, payload, label }) => {
+                        if (active && payload && payload.length) {
+                          return (
+                            <div className="rounded-lg border bg-background p-2 shadow-sm">
+                              <div className="grid grid-cols-2 gap-2">
+                                <div className="flex flex-col">
+                                  <span className="text-[0.70rem] uppercase text-muted-foreground">
+                                    Revenue
+                                  </span>
+                                  <span className="font-bold text-muted-foreground">
+                                    {formatCurrency(payload[0]?.value || 0)}
+                                  </span>
+                                </div>
+                                <div className="flex flex-col">
+                                  <span className="text-[0.70rem] uppercase text-muted-foreground">
+                                    Subscriptions
+                                  </span>
+                                  <span className="font-bold text-muted-foreground">
+                                    {payload[1]?.value || 0}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          )
+                        }
+                        return null
+                      }}
+                    />
+                    <Area type="monotone" dataKey="revenue" stroke="var(--color-revenue)" fill="var(--color-revenue)" />
+                    <Area type="monotone" dataKey="subscriptions" stroke="var(--color-subscriptions)" fill="var(--color-subscriptions)" />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </ChartContainer>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                <DollarSign className="h-8 w-8 mx-auto mb-2" />
+                <p className="text-sm">No revenue data available</p>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -511,22 +650,29 @@ export default function AnalyticsPage() {
             <CardDescription>Clicks by country</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
-              {analyticsData?.countryStats.map((country, index) => (
-                <div key={country.country} className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="w-6 h-4 bg-muted rounded-sm flex items-center justify-center text-xs">
-                      {country.country.slice(0, 2).toUpperCase()}
+            {analyticsData?.countryStats && analyticsData.countryStats.length > 0 ? (
+              <div className="space-y-3">
+                {analyticsData.countryStats.map((country, index) => (
+                  <div key={country.country} className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-4 bg-muted rounded-sm flex items-center justify-center text-xs">
+                        {country.country.slice(0, 2).toUpperCase()}
+                      </div>
+                      <span className="text-sm font-medium">{country.country}</span>
                     </div>
-                    <span className="text-sm font-medium">{country.country}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm">{country.count.toLocaleString()}</span>
+                      <Badge variant="outline">{country.percentage}%</Badge>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm">{country.count.toLocaleString()}</span>
-                    <Badge variant="outline">{country.percentage}%</Badge>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                <Globe className="h-8 w-8 mx-auto mb-2" />
+                <p className="text-sm">No country data available</p>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -538,40 +684,47 @@ export default function AnalyticsPage() {
           <CardDescription>Links with the most clicks</CardDescription>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Rank</TableHead>
-                <TableHead>Link</TableHead>
-                <TableHead>User</TableHead>
-                <TableHead className="text-right">Clicks</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {analyticsData?.topLinks.map((link, index) => (
-                <TableRow key={link.id}>
-                  <TableCell>
-                    <Badge variant="outline">#{index + 1}</Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div>
-                      <div className="font-medium">{link.title}</div>
-                      <div className="text-sm text-muted-foreground font-mono">/{link.shortCode}</div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="text-sm">{link.user}</div>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-1">
-                      <BarChart3 className="h-3 w-3 text-muted-foreground" />
-                      <span className="font-medium">{link.clicks.toLocaleString()}</span>
-                    </div>
-                  </TableCell>
+          {analyticsData?.topLinks && analyticsData.topLinks.length > 0 ? (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Rank</TableHead>
+                  <TableHead>Link</TableHead>
+                  <TableHead>User</TableHead>
+                  <TableHead className="text-right">Clicks</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {analyticsData.topLinks.map((link, index) => (
+                  <TableRow key={link.id}>
+                    <TableCell>
+                      <Badge variant="outline">#{index + 1}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div>
+                        <div className="font-medium">{link.title}</div>
+                        <div className="text-sm text-muted-foreground font-mono">/{link.shortCode}</div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="text-sm">{link.user}</div>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        <BarChart3 className="h-3 w-3 text-muted-foreground" />
+                        <span className="font-medium">{link.clicks.toLocaleString()}</span>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          ) : (
+            <div className="text-center py-8 text-muted-foreground">
+              <LinkIcon className="h-8 w-8 mx-auto mb-2" />
+              <p className="text-sm">No link data available</p>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

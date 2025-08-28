@@ -108,6 +108,18 @@ export const adminApi = {
     }>(`/api/admin/users/regular?${query}`)
   },
 
+  createUser: async (data: {
+    email: string
+    name: string
+    password: string
+    tier: string
+  }) => {
+    return adminApiRequest<{ user: any }>("/api/admin/users/regular", {
+      method: "POST",
+      body: JSON.stringify(data),
+    })
+  },
+
   getUserById: async (id: string) => {
     return adminApiRequest<{ user: any }>(`/api/admin/users/regular/${id}`)
   },
@@ -182,6 +194,12 @@ export const adminApi = {
       clicksByDate: { [key: string]: number }
       topLinks: any[]
       recentActivity: any[]
+      recentUsers: any[]
+      revenue: { total: number; monthly: number; yearly: number }
+      deviceStats: any[]
+      browserStats: any[]
+      countryStats: any[]
+      pendingPayments: number
     }>(`/api/admin/analytics/system?days=${days}`)
   },
 

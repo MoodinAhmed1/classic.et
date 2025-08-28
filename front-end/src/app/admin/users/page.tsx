@@ -109,22 +109,32 @@ export default function UsersPage() {
 
   const handleCreateUser = async () => {
     try {
-      // Mock creation - replace with actual API call
-      const createdUser: AdminUser = {
-        id: Date.now().toString(),
-        ...newUser,
-        subscription_status: "active",
-        email_verified: false,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        links_count: 0,
+      if (!newUser.email || !newUser.name || !newUser.password || !newUser.tier) {
+        alert("Please fill in all required fields")
+        return
       }
 
-      setUsers([...users, createdUser])
-      setNewUser({ email: "", name: "", password: "", tier: "free" })
+      await adminApi.createUser({
+        email: newUser.email,
+        name: newUser.name,
+        password: newUser.password,
+        tier: newUser.tier,
+      })
+
+      // Reset form
+      setNewUser({
+        email: "",
+        name: "",
+        password: "",
+        tier: "free",
+      })
+
+      // Refresh the list
+      await fetchUsers()
       setIsCreateDialogOpen(false)
     } catch (error) {
       console.error("Failed to create user:", error)
+      alert("Failed to create user. Please try again.")
     }
   }
 
@@ -132,15 +142,18 @@ export default function UsersPage() {
     if (!selectedUser) return
 
     try {
-      // Mock update - replace with actual API call
-      const updatedUsers = users.map((user) =>
-        user.id === selectedUser.id ? { ...selectedUser, updated_at: new Date().toISOString() } : user,
-      )
-      setUsers(updatedUsers)
+      await adminApi.updateUser(selectedUser.id, {
+        name: selectedUser.name,
+        email: selectedUser.email,
+        tier: selectedUser.tier,
+        subscriptionStatus: selectedUser.subscription_status,
+      })
+      await fetchUsers() // Refresh the list
       setIsEditDialogOpen(false)
       setSelectedUser(null)
     } catch (error) {
       console.error("Failed to update user:", error)
+      alert("Failed to update user. Please try again.")
     }
   }
 
@@ -148,13 +161,13 @@ export default function UsersPage() {
     if (!selectedUser) return
 
     try {
-      // Mock deletion - replace with actual API call
-      const updatedUsers = users.filter((user) => user.id !== selectedUser.id)
-      setUsers(updatedUsers)
+      await adminApi.deleteUser(selectedUser.id)
+      await fetchUsers() // Refresh the list
       setIsDeleteDialogOpen(false)
       setSelectedUser(null)
     } catch (error) {
       console.error("Failed to delete user:", error)
+      alert("Failed to delete user. Please try again.")
     }
   }
 

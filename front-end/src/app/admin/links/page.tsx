@@ -40,6 +40,7 @@ import {
   RefreshCw,
   Download,
 } from "lucide-react"
+import { adminApi } from "@/lib/admin-api"
 
 interface AdminLink {
   id: string
@@ -83,69 +84,8 @@ export default function LinksPage() {
   const fetchLinks = async () => {
     try {
       setIsLoading(true)
-      // Mock data for now - replace with actual API call
-      const mockLinks: AdminLink[] = [
-        {
-          id: "1",
-          user_id: "user1",
-          user_name: "John Doe",
-          user_email: "john.doe@example.com",
-          original_url: "https://www.example.com/very-long-url-that-needs-shortening",
-          short_code: "abc123",
-          title: "Example Website",
-          description: "A sample website for demonstration",
-          is_active: true,
-          click_count: 245,
-          created_at: "2024-01-15T10:30:00Z",
-          updated_at: "2024-01-20T14:45:00Z",
-          last_clicked: "2024-01-25T09:15:00Z",
-        },
-        {
-          id: "2",
-          user_id: "user2",
-          user_name: "Jane Smith",
-          user_email: "jane.smith@example.com",
-          original_url: "https://github.com/user/repository",
-          short_code: "gh456",
-          custom_domain: "custom.ly",
-          title: "GitHub Repository",
-          is_active: true,
-          expires_at: "2024-12-31T23:59:59Z",
-          click_count: 89,
-          created_at: "2024-01-10T08:20:00Z",
-          updated_at: "2024-01-22T16:30:00Z",
-          last_clicked: "2024-01-24T11:45:00Z",
-        },
-        {
-          id: "3",
-          user_id: "user3",
-          user_name: "Bob Wilson",
-          user_email: "bob.wilson@example.com",
-          original_url: "https://docs.google.com/document/d/1234567890",
-          short_code: "doc789",
-          title: "Important Document",
-          is_active: false,
-          click_count: 12,
-          created_at: "2024-01-05T12:15:00Z",
-          updated_at: "2024-01-18T10:20:00Z",
-          last_clicked: "2024-01-20T15:30:00Z",
-        },
-        {
-          id: "4",
-          user_id: "user1",
-          user_name: "John Doe",
-          user_email: "john.doe@example.com",
-          original_url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-          short_code: "yt999",
-          title: "YouTube Video",
-          is_active: true,
-          click_count: 1567,
-          created_at: "2024-01-12T14:45:00Z",
-          updated_at: "2024-01-21T09:10:00Z",
-          last_clicked: "2024-01-25T13:20:00Z",
-        },
-      ]
-      setLinks(mockLinks)
+      const res = await adminApi.getLinks()
+      setLinks(res.links as any)
     } catch (error) {
       console.error("Failed to fetch links:", error)
     } finally {
@@ -189,12 +129,21 @@ export default function LinksPage() {
 
   const handleToggleStatus = async (linkId: string) => {
     try {
-      const updatedLinks = links.map((link) =>
-        link.id === linkId ? { ...link, is_active: !link.is_active, updated_at: new Date().toISOString() } : link,
+      const link = links.find((l) => l.id === linkId)
+      if (!link) return
+
+      await adminApi.updateLink(linkId, {
+        isActive: !link.is_active,
+      })
+
+      // Update local state
+      const updatedLinks = links.map((l) =>
+        l.id === linkId ? { ...l, is_active: !l.is_active, updated_at: new Date().toISOString() } : l,
       )
       setLinks(updatedLinks)
     } catch (error) {
       console.error("Failed to toggle link status:", error)
+      alert("Failed to update link status. Please try again.")
     }
   }
 
@@ -202,22 +151,33 @@ export default function LinksPage() {
     if (!selectedLink) return
 
     try {
+      await adminApi.deleteLink(selectedLink.id)
+      
+      // Update local state
       const updatedLinks = links.filter((link) => link.id !== selectedLink.id)
       setLinks(updatedLinks)
       setIsDeleteDialogOpen(false)
       setSelectedLink(null)
     } catch (error) {
       console.error("Failed to delete link:", error)
+      alert("Failed to delete link. Please try again.")
     }
   }
 
   const handleBulkDelete = async () => {
     try {
+      // Delete each selected link
+      for (const linkId of selectedLinks) {
+        await adminApi.deleteLink(linkId)
+      }
+      
+      // Update local state
       const updatedLinks = links.filter((link) => !selectedLinks.includes(link.id))
       setLinks(updatedLinks)
       setSelectedLinks([])
     } catch (error) {
       console.error("Failed to delete links:", error)
+      alert("Failed to delete some links. Please try again.")
     }
   }
 
@@ -261,6 +221,37 @@ export default function LinksPage() {
     return { id: userId, name: link?.user_name || "", email: link?.user_email || "" }
   })
 
+  const handleExport = () => {
+    const exportData = {
+      links: filteredLinks.map(link => ({
+        id: link.id,
+        title: link.title || 'Untitled',
+        shortCode: link.short_code,
+        originalUrl: link.original_url,
+        user: link.user_name,
+        userEmail: link.user_email,
+        status: link.is_active ? 'Active' : 'Inactive',
+        clicks: link.click_count,
+        createdAt: link.created_at,
+        expiresAt: link.expires_at
+      })),
+      exportDate: new Date().toISOString(),
+      totalLinks: filteredLinks.length,
+      activeLinks: filteredLinks.filter(l => l.is_active).length,
+      totalClicks: filteredLinks.reduce((sum, link) => sum + link.click_count, 0)
+    }
+
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `links-export-${new Date().toISOString().split('T')[0]}.json`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -276,7 +267,7 @@ export default function LinksPage() {
               Delete Selected ({selectedLinks.length})
             </Button>
           )}
-          <Button variant="outline">
+          <Button variant="outline" onClick={handleExport}>
             <Download className="mr-2 h-4 w-4" />
             Export
           </Button>

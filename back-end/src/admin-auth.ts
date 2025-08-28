@@ -1,6 +1,5 @@
 import { verify } from "hono/jwt"
 import { getCookie } from "hono/cookie"
-import type { D1Database } from "workers-types" // Declare D1Database
 
 // Admin user interface
 export interface AdminUser {
@@ -30,6 +29,16 @@ export interface AdminSession {
 // Password hashing utilities (adapted from existing auth)
 // --- Admin password hashing (PBKDF2 with SHA-256) with legacy SHA-256 fallback ---
 const PBKDF2_ITERATIONS = 150000
+
+// Import the regular hashPassword function for session tokens
+async function hashPassword(password: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(password);
+  const hash = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(hash))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+}
 
 function toHex(buffer: ArrayBuffer): string {
   return Array.from(new Uint8Array(buffer))
