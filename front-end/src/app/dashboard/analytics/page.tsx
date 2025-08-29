@@ -356,18 +356,21 @@ export default function AnalyticsPage() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="h-8 w-8 animate-spin" />
+      <div className="flex items-center justify-center min-h-[400px] px-4">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+          <p className="text-sm text-muted-foreground">Loading analytics...</p>
+        </div>
       </div>
     );
   }
 
   if (!analytics) {
     return (
-      <div className="text-center py-8 sm:py-12">
+      <div className="text-center py-8 px-4">
         <BarChart3 className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-        <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mb-4">No Analytics Data</h2>
-        <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">Create some links to start seeing analytics data.</p>
+        <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">No Analytics Data</h2>
+        <p className="text-sm text-gray-600 dark:text-gray-400 max-w-md mx-auto">Create some links to start seeing analytics data.</p>
       </div>
     );
   }
@@ -379,17 +382,17 @@ export default function AnalyticsPage() {
   const chartData = prepareChartData();
 
   return (
-    <div className="space-y-4 sm:space-y-6">
+    <div className="space-y-4 px-4 sm:px-6 lg:px-8">
       {/* Header */}
-      <div className="flex flex-col space-y-3 sm:space-y-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
+      <div className="flex flex-col space-y-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="space-y-2">
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Analytics</h1>
-          <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mt-1 sm:mt-2">
+          <p className="text-sm text-gray-600 dark:text-gray-400">
             Comprehensive analytics for all your shortened links
           </p>
           {analytics.usage.newVisitorsSinceLastVisit > 0 && (
-            <div className="mt-2 p-2 sm:p-3 bg-blue-50 border border-blue-200 rounded-md">
-              <p className="text-xs sm:text-sm text-blue-700">
+            <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
+              <p className="text-sm text-blue-700">
                 🎉 You have <strong>{analytics.usage.newVisitorsSinceLastVisit}</strong> new visitors since your last visit!
               </p>
             </div>
@@ -423,14 +426,14 @@ export default function AnalyticsPage() {
       {user?.tier === 'premium' ? (
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg sm:text-xl">Analytics View</CardTitle>
+            <CardTitle className="text-lg">Analytics View</CardTitle>
             <CardDescription className="text-sm">Choose how to view your analytics data</CardDescription>
           </CardHeader>
           <CardContent>
             <Tabs defaultValue={analyticsViewMode} onValueChange={(value) => setAnalyticsViewMode(value as 'graphical' | 'standard')}>
               <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="graphical" className="text-xs sm:text-sm">Graphical View</TabsTrigger>
-                <TabsTrigger value="standard" className="text-xs sm:text-sm">Standard View</TabsTrigger>
+                <TabsTrigger value="graphical" className="text-sm">Graphical View</TabsTrigger>
+                <TabsTrigger value="standard" className="text-sm">Standard View</TabsTrigger>
               </TabsList>
             </Tabs>
           </CardContent>
@@ -438,16 +441,16 @@ export default function AnalyticsPage() {
       ) : (
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg sm:text-xl">Analytics View</CardTitle>
+            <CardTitle className="text-lg">Analytics View</CardTitle>
             <CardDescription className="text-sm">Upgrade to Premium for graphical analytics</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 sm:p-4 border rounded-lg space-y-3 sm:space-y-0">
-              <div className="flex items-center space-x-3 sm:space-x-4">
-                <Lock className="h-6 w-6 sm:h-8 sm:w-8 text-gray-400 flex-shrink-0" />
+            <div className="flex flex-col space-y-4 p-4 border rounded-lg sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
+              <div className="flex items-center space-x-4">
+                <Lock className="h-8 w-8 text-gray-400 flex-shrink-0" />
                 <div>
-                  <h3 className="font-medium text-sm sm:text-base">Graphical Analytics</h3>
-                  <p className="text-xs sm:text-sm text-muted-foreground">
+                  <h3 className="font-medium text-base">Graphical Analytics</h3>
+                  <p className="text-sm text-muted-foreground">
                     Visualize your data with charts and graphs
                   </p>
                 </div>
@@ -463,36 +466,36 @@ export default function AnalyticsPage() {
       )}
 
       {/* Overview Stats */}
-      <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs sm:text-sm font-medium">Total Links</CardTitle>
-            <BarChart3 className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Total Links</CardTitle>
+            <BarChart3 className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-lg sm:text-xl lg:text-2xl font-bold">{totalLinks}</div>
+            <div className="text-xl lg:text-2xl font-bold">{totalLinks}</div>
             <p className="text-xs text-muted-foreground">All time</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs sm:text-sm font-medium">Total Clicks</CardTitle>
-            <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Total Clicks</CardTitle>
+            <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-lg sm:text-xl lg:text-2xl font-bold">{totalClicks}</div>
+            <div className="text-xl lg:text-2xl font-bold">{totalClicks}</div>
             <p className="text-xs text-muted-foreground">All time</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs sm:text-sm font-medium">Period Clicks</CardTitle>
-            <Calendar className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Period Clicks</CardTitle>
+            <Calendar className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-lg sm:text-xl lg:text-2xl font-bold">
+            <div className="text-xl lg:text-2xl font-bold">
               {analytics ? Object.values(analytics.clicksByDate).reduce((sum, clicks) => sum + clicks, 0) : 0}
             </div>
             <p className="text-xs text-muted-foreground">Last {timeRange} days</p>
@@ -501,11 +504,11 @@ export default function AnalyticsPage() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs sm:text-sm font-medium">Avg. per Link</CardTitle>
-            <BarChart3 className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Avg. per Link</CardTitle>
+            <BarChart3 className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-lg sm:text-xl lg:text-2xl font-bold">{avgPerLink}</div>
+            <div className="text-xl lg:text-2xl font-bold">{avgPerLink}</div>
             <p className="text-xs text-muted-foreground">Clicks per link</p>
           </CardContent>
         </Card>
@@ -514,13 +517,13 @@ export default function AnalyticsPage() {
       {/* Visitor Cap Warning */}
       {analytics && analytics.usage.visitorCap && analytics.usage.visitorCap.limit && (
         <Card className="border-orange-200 bg-orange-50 dark:bg-orange-900/20 dark:border-orange-800">
-          <CardContent className="p-3 sm:p-4">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-3 sm:space-y-0">
-              <div className="flex items-center gap-2 sm:gap-3">
-                <Lock className="h-4 w-4 sm:h-5 sm:w-5 text-orange-600 flex-shrink-0" />
+          <CardContent className="p-4">
+            <div className="flex flex-col space-y-4 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
+              <div className="flex items-center gap-3">
+                <Lock className="h-5 w-5 text-orange-600 flex-shrink-0" />
                 <div>
-                  <h4 className="font-medium text-sm sm:text-base text-orange-900 dark:text-orange-100">Visitor Cap Active</h4>
-                  <p className="text-xs sm:text-sm text-orange-700 dark:text-orange-300">
+                  <h4 className="font-medium text-base text-orange-900 dark:text-orange-100">Visitor Cap Active</h4>
+                  <p className="text-sm text-orange-700 dark:text-orange-300">
                     You're tracking visitors with a cap of {analytics.usage.visitorCap.limit.toLocaleString()}. 
                     Upgrade to Pro or Premium for higher limits.
                   </p>
@@ -537,26 +540,26 @@ export default function AnalyticsPage() {
         </Card>
       )}
 
-      <Tabs defaultValue="overview" className="space-y-4 sm:space-y-6">
+      <Tabs defaultValue="overview" className="space-y-6">
         <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="overview" className="text-xs sm:text-sm">Overview</TabsTrigger>
-          <TabsTrigger value="performance" className="text-xs sm:text-sm">Performance</TabsTrigger>
-          <TabsTrigger value="audience" className="text-xs sm:text-sm">Audience</TabsTrigger>
+          <TabsTrigger value="overview" className="text-sm">Overview</TabsTrigger>
+          <TabsTrigger value="performance" className="text-sm">Performance</TabsTrigger>
+          <TabsTrigger value="audience" className="text-sm">Audience</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview" className="space-y-4 sm:space-y-6">
+        <TabsContent value="overview" className="space-y-6">
           {!analytics ? (
-            <div className="text-center py-8 sm:py-12">
+            <div className="text-center py-12">
               <Loader2 className="h-12 w-12 mx-auto mb-4 animate-spin text-gray-400" />
               <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">Loading Analytics</h3>
-              <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">Please wait while we fetch your analytics data...</p>
+              <p className="text-sm text-gray-600 dark:text-gray-400">Please wait while we fetch your analytics data...</p>
             </div>
           ) : (
-          <div className="grid gap-4 sm:gap-6 grid-cols-1 lg:grid-cols-2">
+          <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
             {/* Clicks Over Time */}
             <Card className="lg:col-span-2">
               <CardHeader>
-                <CardTitle className="text-lg sm:text-xl">Clicks Over Time</CardTitle>
+                <CardTitle className="text-xl">Clicks Over Time</CardTitle>
                 <CardDescription className="text-sm">Click trends over the selected period</CardDescription>
               </CardHeader>
               <CardContent>
@@ -564,7 +567,7 @@ export default function AnalyticsPage() {
                   <div className="text-center py-8">
                     <Calendar className="h-12 w-12 mx-auto mb-4 text-gray-400" />
                     <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No Data Available</h3>
-                    <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mb-4">No clicks recorded in the selected time period.</p>
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">No clicks recorded in the selected time period.</p>
                   </div>
                 ) : (
                   <>
@@ -587,8 +590,8 @@ export default function AnalyticsPage() {
                       <div className="space-y-2">
                         {chartData.clicksByDate.map((item) => (
                           <div key={item.date} className="flex items-center justify-between py-2">
-                            <span className="text-xs sm:text-sm">{item.date}</span>
-                            <div className="flex items-center space-x-2">
+                            <span className="text-sm min-w-0 flex-1 pr-2">{item.date}</span>
+                            <div className="flex items-center space-x-2 flex-shrink-0">
                               <div className="w-20 sm:w-32 bg-gray-200 rounded-full h-2">
                                 <div 
                                   className="bg-blue-600 h-2 rounded-full" 
@@ -597,7 +600,7 @@ export default function AnalyticsPage() {
                                   }}
                                 ></div>
                               </div>
-                              <span className="text-xs sm:text-sm font-medium w-8 sm:w-12 text-right">{item.clicks}</span>
+                              <span className="text-sm font-medium w-12 text-right">{item.clicks}</span>
                             </div>
                           </div>
                         ))}
@@ -611,7 +614,7 @@ export default function AnalyticsPage() {
             {/* Top Performing Links */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg sm:text-xl">Top Performing Links</CardTitle>
+                <CardTitle className="text-xl">Top Performing Links</CardTitle>
                 <CardDescription className="text-sm">Your most clicked links</CardDescription>
               </CardHeader>
               <CardContent>
@@ -620,17 +623,17 @@ export default function AnalyticsPage() {
                     .sort((a, b) => b.clickCount - a.clickCount)
                     .slice(0, 5)
                     .map((link, index) => (
-                      <div key={link.id} className="flex items-center justify-between p-2 border rounded-lg">
-                        <div className="flex items-center space-x-2 sm:space-x-3">
-                          <div className="w-6 h-6 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
+                      <div key={link.id} className="flex items-center justify-between p-3 border rounded-lg">
+                        <div className="flex items-center space-x-3 min-w-0 flex-1">
+                          <div className="w-6 h-6 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center flex-shrink-0">
                             <span className="text-xs font-medium text-blue-600 dark:text-blue-400">{index + 1}</span>
                           </div>
                           <div className="min-w-0 flex-1">
-                            <p className="text-xs sm:text-sm font-medium truncate">{link.title || 'Untitled'}</p>
-                            <p className="text-xs text-muted-foreground font-mono">/{link.shortCode}</p>
+                            <p className="text-sm font-medium truncate">{link.title || 'Untitled'}</p>
+                            <p className="text-xs text-muted-foreground font-mono truncate">/{link.shortCode}</p>
                           </div>
                         </div>
-                        <div className="text-right">
+                        <div className="text-right flex-shrink-0 ml-2">
                           <p className="text-sm font-medium">{link.clickCount}</p>
                           <p className="text-xs text-muted-foreground">clicks</p>
                         </div>
@@ -643,7 +646,7 @@ export default function AnalyticsPage() {
             {/* Geographic Distribution */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg sm:text-xl">Geographic Distribution</CardTitle>
+                <CardTitle className="text-xl">Geographic Distribution</CardTitle>
                 <CardDescription className="text-sm">Clicks by country</CardDescription>
               </CardHeader>
               <CardContent>
@@ -658,12 +661,12 @@ export default function AnalyticsPage() {
                       .sort(([,a], [,b]) => b - a)
                       .slice(0, 5)
                       .map(([country, clicks]) => (
-                        <div key={country} className="flex items-center justify-between p-2 border rounded-lg">
-                          <div className="flex items-center space-x-2 sm:space-x-3">
-                            <Globe className="h-4 w-4 text-blue-600" />
-                            <span className="text-xs sm:text-sm">{countryCodeToName(country)}</span>
+                        <div key={country} className="flex items-center justify-between p-3 border rounded-lg">
+                          <div className="flex items-center space-x-3 min-w-0 flex-1">
+                            <Globe className="h-4 w-4 text-blue-600 flex-shrink-0" />
+                            <span className="text-sm truncate">{countryCodeToName(country)}</span>
                           </div>
-                          <div className="text-right">
+                          <div className="text-right flex-shrink-0 ml-2">
                             <p className="text-sm font-medium">{clicks}</p>
                             <p className="text-xs text-muted-foreground">
                               {Math.round((clicks / analytics.totalClicks) * 100)}%
@@ -679,10 +682,10 @@ export default function AnalyticsPage() {
           )}
         </TabsContent>
 
-        <TabsContent value="performance" className="space-y-4 sm:space-y-6">
+        <TabsContent value="performance" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg sm:text-xl">Link Performance</CardTitle>
+              <CardTitle className="text-xl">Link Performance</CardTitle>
               <CardDescription className="text-sm">Detailed performance of your links</CardDescription>
             </CardHeader>
             <CardContent>
@@ -690,10 +693,10 @@ export default function AnalyticsPage() {
                 {analytics.links
                   .sort((a, b) => b.clickCount - a.clickCount)
                   .map((link) => (
-                    <div key={link.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 border rounded-lg space-y-2 sm:space-y-0">
+                    <div key={link.id} className="flex flex-col space-y-2 p-3 border rounded-lg sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
                       <div className="flex-1 min-w-0">
-                        <h3 className="font-medium text-sm sm:text-base truncate">{link.title || 'Untitled'}</h3>
-                        <p className="text-xs text-muted-foreground font-mono">/{link.shortCode}</p>
+                        <h3 className="font-medium text-base truncate">{link.title || 'Untitled'}</h3>
+                        <p className="text-xs text-muted-foreground font-mono truncate">/{link.shortCode}</p>
                       </div>
                       <div className="flex items-center space-x-4 text-sm">
                         <div className="text-center">
@@ -712,12 +715,12 @@ export default function AnalyticsPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="audience" className="space-y-4 sm:space-y-6">
-          <div className="grid gap-4 sm:gap-6 grid-cols-1 lg:grid-cols-2">
+        <TabsContent value="audience" className="space-y-6">
+          <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
             {/* Device Distribution */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg sm:text-xl">Device Distribution</CardTitle>
+                <CardTitle className="text-xl">Device Distribution</CardTitle>
                 <CardDescription className="text-sm">Clicks by device type</CardDescription>
               </CardHeader>
               <CardContent>
@@ -731,12 +734,12 @@ export default function AnalyticsPage() {
                     {Object.entries(analytics.clicksByDevice)
                       .sort(([,a], [,b]) => b - a)
                       .map(([device, clicks]) => (
-                        <div key={device} className="flex items-center justify-between p-2 border rounded-lg">
-                          <div className="flex items-center space-x-2 sm:space-x-3">
+                        <div key={device} className="flex items-center justify-between p-3 border rounded-lg">
+                          <div className="flex items-center space-x-3 min-w-0 flex-1">
                             {getDeviceIcon(device)}
-                            <span className="text-xs sm:text-sm capitalize">{device}</span>
+                            <span className="text-sm capitalize truncate">{device}</span>
                           </div>
-                          <div className="text-right">
+                          <div className="text-right flex-shrink-0 ml-2">
                             <p className="text-sm font-medium">{clicks}</p>
                             <p className="text-xs text-muted-foreground">
                               {Math.round((clicks / analytics.totalClicks) * 100)}%
@@ -752,7 +755,7 @@ export default function AnalyticsPage() {
             {/* Browser Distribution */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg sm:text-xl">Browser Distribution</CardTitle>
+                <CardTitle className="text-xl">Browser Distribution</CardTitle>
                 <CardDescription className="text-sm">Clicks by browser</CardDescription>
               </CardHeader>
               <CardContent>
@@ -767,12 +770,12 @@ export default function AnalyticsPage() {
                       .sort(([,a], [,b]) => b - a)
                       .slice(0, 8)
                       .map(([browser, clicks]) => (
-                        <div key={browser} className="flex items-center justify-between p-2 border rounded-lg">
-                          <div className="flex items-center space-x-2 sm:space-x-3">
-                            <Globe className="h-4 w-4 text-blue-600" />
-                            <span className="text-xs sm:text-sm">{browser}</span>
+                        <div key={browser} className="flex items-center justify-between p-3 border rounded-lg">
+                          <div className="flex items-center space-x-3 min-w-0 flex-1">
+                            <Globe className="h-4 w-4 text-blue-600 flex-shrink-0" />
+                            <span className="text-sm truncate">{browser}</span>
                           </div>
-                          <div className="text-right">
+                          <div className="text-right flex-shrink-0 ml-2">
                             <p className="text-sm font-medium">{clicks}</p>
                             <p className="text-xs text-muted-foreground">
                               {Math.round((clicks / analytics.totalClicks) * 100)}%
