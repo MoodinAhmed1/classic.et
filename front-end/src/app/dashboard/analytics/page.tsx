@@ -541,11 +541,37 @@ export default function AnalyticsPage() {
       )}
 
       <Tabs defaultValue="overview" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="overview" className="text-sm">Overview</TabsTrigger>
-          <TabsTrigger value="performance" className="text-sm">Performance</TabsTrigger>
-          <TabsTrigger value="audience" className="text-sm">Audience</TabsTrigger>
-        </TabsList>
+        <div className="border-b border-gray-200 dark:border-gray-700">
+          <TabsList className="grid w-full grid-cols-1 sm:grid-cols-3 h-auto sm:h-10 bg-transparent p-0 gap-0">
+            <TabsTrigger 
+              value="overview" 
+              className="text-sm py-4 sm:py-2 px-6 sm:px-4 h-auto sm:h-8 rounded-none sm:rounded-sm border-b-2 sm:border-b-0 border-transparent data-[state=active]:border-blue-600 data-[state=active]:bg-transparent data-[state=active]:text-blue-600 bg-transparent hover:bg-gray-50 dark:hover:bg-gray-800"
+            >
+              <div className="flex items-center justify-center w-full space-x-2 sm:space-x-1.5">
+                <BarChart3 className="h-4 w-4 flex-shrink-0" />
+                <span className="font-medium">Overview</span>
+              </div>
+            </TabsTrigger>
+            <TabsTrigger 
+              value="performance" 
+              className="text-sm py-4 sm:py-2 px-6 sm:px-4 h-auto sm:h-8 rounded-none sm:rounded-sm border-b-2 sm:border-b-0 border-transparent data-[state=active]:border-blue-600 data-[state=active]:bg-transparent data-[state=active]:text-blue-600 bg-transparent hover:bg-gray-50 dark:hover:bg-gray-800"
+            >
+              <div className="flex items-center justify-center w-full space-x-2 sm:space-x-1.5">
+                <TrendingUp className="h-4 w-4 flex-shrink-0" />
+                <span className="font-medium">Performance</span>
+              </div>
+            </TabsTrigger>
+            <TabsTrigger 
+              value="audience" 
+              className="text-sm py-4 sm:py-2 px-6 sm:px-4 h-auto sm:h-8 rounded-none sm:rounded-sm border-b-2 sm:border-b-0 border-transparent data-[state=active]:border-blue-600 data-[state=active]:bg-transparent data-[state=active]:text-blue-600 bg-transparent hover:bg-gray-50 dark:hover:bg-gray-800"
+            >
+              <div className="flex items-center justify-center w-full space-x-2 sm:space-x-1.5">
+                <Globe className="h-4 w-4 flex-shrink-0" />
+                <span className="font-medium">Audience</span>
+              </div>
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
         <TabsContent value="overview" className="space-y-6">
           {!analytics ? (

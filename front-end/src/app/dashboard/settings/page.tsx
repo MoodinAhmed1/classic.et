@@ -199,11 +199,11 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="space-y-4 sm:space-y-6">
+    <div className="space-y-4 px-4 sm:px-6 lg:px-8">
       {/* Header */}
-      <div>
+      <div className="space-y-2">
         <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Settings</h1>
-        <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mt-1 sm:mt-2">
+        <p className="text-sm text-gray-600 dark:text-gray-400">
           Manage your account settings and preferences
         </p>
       </div>
@@ -211,23 +211,23 @@ export default function SettingsPage() {
       {/* Current Plan Info */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg sm:text-xl">Current Plan</CardTitle>
+          <CardTitle className="text-lg">Current Plan</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col space-y-4 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
             <div className="flex items-center space-x-3">
               {getTierIcon(user?.tier || 'free')}
               <div>
-                <h3 className="font-medium text-sm sm:text-base">
+                <h3 className="font-medium text-base">
                   {user?.tier?.toUpperCase() || 'FREE'} Plan
                 </h3>
-                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
+                <p className="text-sm text-gray-600 dark:text-gray-400">
                   {user?.tier === 'premium' ? 'Unlimited everything' : 
                    user?.tier === 'pro' ? 'Advanced features' : 'Basic features'}
                 </p>
               </div>
             </div>
-            <Badge className={`text-xs sm:text-sm ${getTierColor(user?.tier || 'free')}`}>
+            <Badge className={`text-sm ${getTierColor(user?.tier || 'free')}`}>
               {user?.tier?.toUpperCase() || 'FREE'}
             </Badge>
           </div>
@@ -235,19 +235,53 @@ export default function SettingsPage() {
       </Card>
 
       {/* Settings Tabs */}
-      <Tabs defaultValue="profile" className="space-y-4 sm:space-y-6">
-        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4">
-          <TabsTrigger value="profile" className="text-xs sm:text-sm">Profile</TabsTrigger>
-          <TabsTrigger value="security" className="text-xs sm:text-sm">Security</TabsTrigger>
-          <TabsTrigger value="notifications" className="text-xs sm:text-sm">Notifications</TabsTrigger>
-          <TabsTrigger value="api" className="text-xs sm:text-sm">API</TabsTrigger>
-        </TabsList>
+      <Tabs defaultValue="profile" className="space-y-6">
+        <div className="border-b border-gray-200 dark:border-gray-700">
+          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 h-auto sm:h-10 bg-transparent p-0 gap-0">
+            <TabsTrigger 
+              value="profile" 
+              className="text-sm py-4 sm:py-2 px-4 sm:px-3 h-auto sm:h-8 rounded-none sm:rounded-sm border-b-2 sm:border-b-0 border-transparent data-[state=active]:border-blue-600 data-[state=active]:bg-transparent data-[state=active]:text-blue-600 bg-transparent hover:bg-gray-50 dark:hover:bg-gray-800"
+            >
+              <div className="flex items-center justify-center w-full space-x-2 sm:space-x-1.5">
+                <User className="h-4 w-4 flex-shrink-0" />
+                <span className="font-medium">Profile</span>
+              </div>
+            </TabsTrigger>
+            <TabsTrigger 
+              value="security" 
+              className="text-sm py-4 sm:py-2 px-4 sm:px-3 h-auto sm:h-8 rounded-none sm:rounded-sm border-b-2 sm:border-b-0 border-transparent data-[state=active]:border-blue-600 data-[state=active]:bg-transparent data-[state=active]:text-blue-600 bg-transparent hover:bg-gray-50 dark:hover:bg-gray-800"
+            >
+              <div className="flex items-center justify-center w-full space-x-2 sm:space-x-1.5">
+                <Shield className="h-4 w-4 flex-shrink-0" />
+                <span className="font-medium">Security</span>
+              </div>
+            </TabsTrigger>
+            <TabsTrigger 
+              value="notifications" 
+              className="text-sm py-4 sm:py-2 px-4 sm:px-3 h-auto sm:h-8 rounded-none sm:rounded-sm border-b-2 sm:border-b-0 border-transparent data-[state=active]:border-blue-600 data-[state=active]:bg-transparent data-[state=active]:text-blue-600 bg-transparent hover:bg-gray-50 dark:hover:bg-gray-800"
+            >
+              <div className="flex items-center justify-center w-full space-x-2 sm:space-x-1.5">
+                <Bell className="h-4 w-4 flex-shrink-0" />
+                <span className="font-medium">Notifications</span>
+              </div>
+            </TabsTrigger>
+            <TabsTrigger 
+              value="api" 
+              className="text-sm py-4 sm:py-2 px-4 sm:px-3 h-auto sm:h-8 rounded-none sm:rounded-sm border-b-2 sm:border-b-0 border-transparent data-[state=active]:border-blue-600 data-[state=active]:bg-transparent data-[state=active]:text-blue-600 bg-transparent hover:bg-gray-50 dark:hover:bg-gray-800"
+            >
+              <div className="flex items-center justify-center w-full space-x-2 sm:space-x-1.5">
+                <Key className="h-4 w-4 flex-shrink-0" />
+                <span className="font-medium">API</span>
+              </div>
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
         {/* Profile Tab */}
-        <TabsContent value="profile" className="space-y-4 sm:space-y-6">
+        <TabsContent value="profile" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg sm:text-xl flex items-center">
+              <CardTitle className="text-xl flex items-center">
                 <User className="h-5 w-5 mr-2" />
                 Profile Information
               </CardTitle>
@@ -312,10 +346,10 @@ export default function SettingsPage() {
         </TabsContent>
 
         {/* Security Tab */}
-        <TabsContent value="security" className="space-y-4 sm:space-y-6">
+        <TabsContent value="security" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg sm:text-xl flex items-center">
+              <CardTitle className="text-xl flex items-center">
                 <Shield className="h-5 w-5 mr-2" />
                 Security Settings
               </CardTitle>
@@ -381,10 +415,10 @@ export default function SettingsPage() {
         </TabsContent>
 
         {/* Notifications Tab */}
-        <TabsContent value="notifications" className="space-y-4 sm:space-y-6">
+        <TabsContent value="notifications" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg sm:text-xl flex items-center">
+              <CardTitle className="text-xl flex items-center">
                 <Bell className="h-5 w-5 mr-2" />
                 Notification Preferences
               </CardTitle>
@@ -393,8 +427,8 @@ export default function SettingsPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
+              <div className="flex flex-col space-y-3 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
+                <div className="space-y-0.5 min-w-0 flex-1">
                   <Label className="text-sm">Email Notifications</Label>
                   <p className="text-xs text-gray-600 dark:text-gray-400">
                     Receive notifications about your account via email
@@ -403,11 +437,12 @@ export default function SettingsPage() {
                 <Switch
                   checked={emailNotifications}
                   onCheckedChange={setEmailNotifications}
+                  className="flex-shrink-0"
                 />
               </div>
               <Separator />
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
+              <div className="flex flex-col space-y-3 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
+                <div className="space-y-0.5 min-w-0 flex-1">
                   <Label className="text-sm">Marketing Emails</Label>
                   <p className="text-xs text-gray-600 dark:text-gray-400">
                     Receive promotional emails and updates
@@ -416,11 +451,12 @@ export default function SettingsPage() {
                 <Switch
                   checked={marketingEmails}
                   onCheckedChange={setMarketingEmails}
+                  className="flex-shrink-0"
                 />
               </div>
               <Separator />
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
+              <div className="flex flex-col space-y-3 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
+                <div className="space-y-0.5 min-w-0 flex-1">
                   <Label className="text-sm">Weekly Reports</Label>
                   <p className="text-xs text-gray-600 dark:text-gray-400">
                     Get weekly analytics reports via email
@@ -429,6 +465,7 @@ export default function SettingsPage() {
                 <Switch
                   checked={weeklyReports}
                   onCheckedChange={setWeeklyReports}
+                  className="flex-shrink-0"
                 />
               </div>
               <Button 
@@ -453,10 +490,10 @@ export default function SettingsPage() {
         </TabsContent>
 
         {/* API Tab */}
-        <TabsContent value="api" className="space-y-4 sm:space-y-6">
+        <TabsContent value="api" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg sm:text-xl flex items-center">
+              <CardTitle className="text-xl flex items-center">
                 <Key className="h-5 w-5 mr-2" />
                 API Access
               </CardTitle>
@@ -467,18 +504,18 @@ export default function SettingsPage() {
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label className="text-sm">API Key</Label>
-                <div className="flex items-center space-x-2">
+                <div className="flex flex-col space-y-2 sm:flex-row sm:items-center sm:space-y-0 sm:space-x-2">
                   <Input
                     type={isApiKeyVisible ? "text" : "password"}
                     value={apiKey}
                     readOnly
-                    className="text-sm font-mono"
+                    className="text-sm font-mono flex-1"
                   />
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => setIsApiKeyVisible(!isApiKeyVisible)}
-                    className="text-xs"
+                    className="text-xs w-full sm:w-auto"
                   >
                     {isApiKeyVisible ? "Hide" : "Show"}
                   </Button>
@@ -487,11 +524,11 @@ export default function SettingsPage() {
                   Keep your API key secure and never share it publicly
                 </p>
               </div>
-              <div className="flex flex-col sm:flex-row gap-2">
+              <div className="flex flex-col space-y-2 sm:flex-row sm:space-y-0 sm:space-x-2">
                 <Button 
                   variant="outline"
                   onClick={generateNewApiKey}
-                  className="text-sm"
+                  className="text-sm w-full sm:w-auto"
                 >
                   <Key className="mr-2 h-4 w-4" />
                   Generate New Key
@@ -499,7 +536,7 @@ export default function SettingsPage() {
                 <Button 
                   variant="outline"
                   onClick={() => navigator.clipboard.writeText(apiKey)}
-                  className="text-sm"
+                  className="text-sm w-full sm:w-auto"
                 >
                   <Copy className="mr-2 h-4 w-4" />
                   Copy Key
@@ -513,16 +550,16 @@ export default function SettingsPage() {
       {/* Danger Zone */}
       <Card className="border-red-200 dark:border-red-800">
         <CardHeader>
-          <CardTitle className="text-lg sm:text-xl text-red-600 dark:text-red-400 flex items-center">
+          <CardTitle className="text-xl text-red-600 dark:text-red-400 flex items-center">
             <Trash2 className="h-5 w-5 mr-2" />
             Danger Zone
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
-            <div>
-              <h3 className="font-medium text-sm sm:text-base">Delete Account</h3>
-              <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
+          <div className="flex flex-col space-y-4 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
+            <div className="min-w-0 flex-1">
+              <h3 className="font-medium text-base">Delete Account</h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
                 Permanently delete your account and all associated data
               </p>
             </div>
