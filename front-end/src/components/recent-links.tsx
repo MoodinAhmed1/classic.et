@@ -99,21 +99,12 @@ export function RecentLinks({ limit = 10 }: RecentLinksProps) {
 
   if (isLoading) {
     return (
-      <div className="space-y-4">
+      <div className="space-y-3 sm:space-y-4">
         {[...Array(3)].map((_, i) => (
-          <div key={i} className="animate-pulse">
-            <div className="flex items-center justify-between p-4 border rounded-lg">
-              <div className="flex-1">
-                <div className="h-4 bg-gray-200 rounded w-1/3 mb-2"></div>
-                <div className="h-3 bg-gray-200 rounded w-2/3 mb-1"></div>
-                <div className="h-3 bg-gray-200 rounded w-1/2"></div>
-              </div>
-              <div className="flex space-x-2">
-                <div className="h-8 w-8 bg-gray-200 rounded"></div>
-                <div className="h-8 w-8 bg-gray-200 rounded"></div>
-                <div className="h-8 w-8 bg-gray-200 rounded"></div>
-              </div>
-            </div>
+          <div key={i} className="p-3 sm:p-4 border rounded-lg animate-pulse">
+            <div className="h-4 bg-gray-200 rounded w-1/3 mb-2"></div>
+            <div className="h-3 bg-gray-200 rounded w-full mb-2"></div>
+            <div className="h-3 bg-gray-200 rounded w-2/3"></div>
           </div>
         ))}
       </div>
@@ -122,85 +113,89 @@ export function RecentLinks({ limit = 10 }: RecentLinksProps) {
 
   if (links.length === 0) {
     return (
-      <div className="text-center py-8 text-muted-foreground">
-        <LinkIcon className="h-12 w-12 mx-auto mb-4 opacity-50" />
-        <p>No links created yet.</p>
-        <p className="text-sm">Create your first shortened link above!</p>
+      <div className="text-center py-8 sm:py-12">
+        <LinkIcon className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+        <h3 className="text-lg sm:text-xl font-medium text-gray-900 dark:text-white mb-2">No links yet</h3>
+        <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">
+          Create your first shortened link above!
+        </p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3 sm:space-y-4">
       {links.map((link) => (
         <div
           key={link.id}
-          className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors"
+          className="flex flex-col sm:flex-row sm:items-center justify-between p-3 sm:p-4 border rounded-lg hover:bg-muted/50 transition-colors"
         >
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center space-x-2 mb-1">
-              <h3 className="font-medium truncate">
+          <div className="flex-1 min-w-0 mb-3 sm:mb-0">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-2 mb-1 sm:mb-2">
+              <h3 className="font-medium truncate text-sm sm:text-base">
                 {link.title || 'Untitled'}
               </h3>
-              <div className="flex items-center space-x-1">
+              <div className="flex items-center space-x-1 mt-1 sm:mt-0">
                 {!link.isActive && (
-                  <Badge variant="secondary">Inactive</Badge>
+                  <Badge variant="secondary" className="text-xs">Inactive</Badge>
                 )}
                 {isExpired(link.expiresAt) && (
-                  <Badge variant="destructive">Expired</Badge>
+                  <Badge variant="destructive" className="text-xs">Expired</Badge>
                 )}
               </div>
             </div>
-            <p className="text-sm text-muted-foreground truncate mb-1">
+            <p className="text-xs sm:text-sm text-muted-foreground truncate mb-1 sm:mb-2">
               {link.originalUrl}
             </p>
-            <div className="flex items-center space-x-4 text-xs text-muted-foreground">
-              <span className="font-mono">{getShortUrl(link.shortCode)}</span>
+            <div className="flex flex-col sm:flex-row sm:items-center space-y-1 sm:space-y-0 sm:space-x-4 text-xs text-muted-foreground">
+              <span className="font-mono break-all sm:break-normal">{getShortUrl(link.shortCode)}</span>
               <span>{link.clickCount} clicks</span>
               <span>{new Date(link.createdAt).toLocaleDateString()}</span>
             </div>
           </div>
           
-          <div className="flex items-center space-x-2 ml-4">
+          <div className="flex items-center space-x-2 sm:space-x-3">
             <Button
+              variant="outline"
               size="sm"
-              variant="ghost"
               onClick={() => copyToClipboard(link.shortCode)}
+              className="h-8 px-2 sm:px-3 text-xs"
             >
-              <Copy className="h-4 w-4" />
+              <Copy className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+              <span className="hidden sm:inline">Copy</span>
             </Button>
+            
             <Button
+              variant="outline"
               size="sm"
-              variant="ghost"
               onClick={() => window.open(getShortUrl(link.shortCode), '_blank')}
+              className="h-8 px-2 sm:px-3 text-xs"
             >
-              <ExternalLink className="h-4 w-4" />
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => router.push(`/dashboard/links/${link.id}`)}
-            >
-              <BarChart3 className="h-4 w-4" />
+              <ExternalLink className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+              <span className="hidden sm:inline">Visit</span>
             </Button>
             
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button size="sm" variant="ghost">
-                  <MoreHorizontal className="h-4 w-4" />
+                <Button variant="outline" size="sm" className="h-8 w-8 p-0">
+                  <MoreHorizontal className="h-3 w-3 sm:h-4 sm:w-4" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
+              <DropdownMenuContent align="end" className="w-40">
                 <DropdownMenuItem onClick={() => router.push(`/dashboard/links/${link.id}`)}>
+                  <BarChart3 className="mr-2 h-4 w-4" />
+                  <span>Analytics</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => router.push(`/dashboard/links/${link.id}/edit`)}>
                   <Edit className="mr-2 h-4 w-4" />
-                  Edit
+                  <span>Edit</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem 
                   onClick={() => handleDelete(link.id)}
-                  className="text-red-600"
+                  className="text-red-600 focus:text-red-600"
                 >
                   <Trash2 className="mr-2 h-4 w-4" />
-                  Delete
+                  <span>Delete</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

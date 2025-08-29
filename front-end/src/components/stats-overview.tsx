@@ -55,13 +55,13 @@ export function StatsOverview() {
 
   if (isLoading) {
     return (
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
         {[...Array(4)].map((_, i) => (
           <Card key={i}>
-            <CardContent className="p-6">
+            <CardContent className="p-3 sm:p-4 lg:p-6">
               <div className="animate-pulse">
-                <div className="h-4 bg-gray-200 rounded w-1/2 mb-2"></div>
-                <div className="h-8 bg-gray-200 rounded w-1/3"></div>
+                <div className="h-3 sm:h-4 bg-gray-200 rounded w-1/2 mb-2"></div>
+                <div className="h-6 sm:h-8 bg-gray-200 rounded w-1/3"></div>
               </div>
             </CardContent>
           </Card>
@@ -71,14 +71,14 @@ export function StatsOverview() {
   }
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+    <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Total Links</CardTitle>
-          <Link className="h-4 w-4 text-muted-foreground" />
+          <CardTitle className="text-xs sm:text-sm font-medium">Total Links</CardTitle>
+          <Link className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">{stats.totalLinks}</div>
+          <div className="text-lg sm:text-xl lg:text-2xl font-bold">{stats.totalLinks}</div>
           <p className="text-xs text-muted-foreground">
             All time
           </p>
@@ -87,11 +87,11 @@ export function StatsOverview() {
       
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Total Clicks</CardTitle>
-          <MousePointer className="h-4 w-4 text-muted-foreground" />
+          <CardTitle className="text-xs sm:text-sm font-medium">Total Clicks</CardTitle>
+          <MousePointer className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">{stats.totalClicks}</div>
+          <div className="text-lg sm:text-xl lg:text-2xl font-bold">{stats.totalClicks}</div>
           <p className="text-xs text-muted-foreground">
             All time
           </p>
@@ -100,11 +100,11 @@ export function StatsOverview() {
       
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">This Month</CardTitle>
-          <Calendar className="h-4 w-4 text-muted-foreground" />
+          <CardTitle className="text-xs sm:text-sm font-medium">This Month</CardTitle>
+          <Calendar className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">{stats.linksThisMonth}</div>
+          <div className="text-lg sm:text-xl lg:text-2xl font-bold">{stats.linksThisMonth}</div>
           <p className="text-xs text-muted-foreground">
             New links created
           </p>
@@ -113,11 +113,11 @@ export function StatsOverview() {
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Avg. Clicks</CardTitle>
-          <TrendingUp className="h-4 w-4 text-muted-foreground" />
+          <CardTitle className="text-xs sm:text-sm font-medium">Avg. Clicks</CardTitle>
+          <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">{stats.avgClicksPerLink}</div>
+          <div className="text-lg sm:text-xl lg:text-2xl font-bold">{stats.avgClicksPerLink}</div>
           <p className="text-xs text-muted-foreground">
             Per link
           </p>

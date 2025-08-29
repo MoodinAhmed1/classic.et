@@ -39,6 +39,12 @@ const navigation = [
     description: "Manage user accounts",
   },
   {
+    name: "Admins",
+    href: "/admin/admins",
+    icon: Shield,
+    description: "Manage admin accounts",
+  },
+  {
     name: "Links",
     href: "/admin/links",
     icon: LinkIcon,
@@ -64,7 +70,7 @@ const navigation = [
   },
   {
     name: "Activity Log",
-    href: "/admin/activity",
+    href: "/admin/activity-logs",
     icon: Activity,
     description: "Admin activity audit trail",
   },
@@ -120,11 +126,12 @@ export function AdminSidebar({ className }: AdminSidebarProps) {
               const routeToPerm: Record<string, { resource: string; action: string }> = {
                 "/admin/dashboard": { resource: "system", action: "read" },
                 "/admin/users": { resource: "users", action: "read" },
+                "/admin/admins": { resource: "admins", action: "read" },
                 "/admin/links": { resource: "links", action: "read" },
                 "/admin/analytics": { resource: "analytics", action: "read" },
                 "/admin/subscriptions": { resource: "subscriptions", action: "read" },
                 "/admin/payments": { resource: "subscriptions", action: "read" },
-                "/admin/activity": { resource: "system", action: "read" },
+                "/admin/activity-logs": { resource: "system", action: "read" },
                 "/admin/settings": { resource: "system", action: "write" },
               }
               const perm = routeToPerm[item.href]

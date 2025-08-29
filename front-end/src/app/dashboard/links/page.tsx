@@ -135,16 +135,16 @@ export default function LinksPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex flex-col space-y-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col space-y-3 sm:space-y-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Links</h1>
-          <p className="text-gray-600 mt-2">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Links</h1>
+          <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mt-1 sm:mt-2">
             Manage all your shortened links in one place
           </p>
         </div>
-        <Link href="/dashboard">
+        <Link href="/dashboard" className="w-full sm:w-auto">
           <Button className="w-full sm:w-auto">
             <Plus className="mr-2 h-4 w-4" />
             Create Link
@@ -154,7 +154,7 @@ export default function LinksPage() {
 
       {/* Search and Filters */}
       <Card>
-        <CardContent className="pt-6">
+        <CardContent className="pt-4 sm:pt-6">
           <div className="flex flex-col space-y-3 sm:flex-row sm:items-center sm:space-y-0 sm:space-x-4">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -176,14 +176,14 @@ export default function LinksPage() {
       {/* Links Table */}
       <Card>
         <CardHeader>
-          <CardTitle>All Links ({filteredLinks.length})</CardTitle>
-          <CardDescription>
+          <CardTitle className="text-lg sm:text-xl">All Links ({filteredLinks.length})</CardTitle>
+          <CardDescription className="text-sm">
             View and manage your shortened links
           </CardDescription>
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <div className="space-y-4">
+            <div className="space-y-3 sm:space-y-4">
               {[...Array(5)].map((_, i) => (
                 <div key={i} className="animate-pulse">
                   <div className="h-12 bg-gray-200 rounded"></div>
@@ -191,8 +191,8 @@ export default function LinksPage() {
               ))}
             </div>
           ) : filteredLinks.length === 0 ? (
-            <div className="text-center py-12">
-              <div className="text-gray-400 mb-4">
+            <div className="text-center py-8 sm:py-12">
+              <div className="text-gray-400 mb-4 text-sm sm:text-base">
                 {searchQuery ? 'No links match your search' : 'No links created yet'}
               </div>
               {!searchQuery && (
@@ -206,110 +206,89 @@ export default function LinksPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Title</TableHead>
-                    <TableHead>Original URL</TableHead>
-                    <TableHead>Short Code</TableHead>
-                    <TableHead>Clicks</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Created</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                    <TableHead className="text-xs sm:text-sm">Title</TableHead>
+                    <TableHead className="text-xs sm:text-sm hidden sm:table-cell">Original URL</TableHead>
+                    <TableHead className="text-xs sm:text-sm">Short URL</TableHead>
+                    <TableHead className="text-xs sm:text-sm text-center">Clicks</TableHead>
+                    <TableHead className="text-xs sm:text-sm hidden md:table-cell">Created</TableHead>
+                    <TableHead className="text-xs sm:text-sm text-center">Status</TableHead>
+                    <TableHead className="text-xs sm:text-sm text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredLinks.map((link) => (
                     <TableRow key={link.id}>
-                      <TableCell className="font-medium">
-                        {link.title || 'Untitled'}
+                      <TableCell className="font-medium text-xs sm:text-sm">
+                        <div className="max-w-[120px] sm:max-w-[200px] truncate">
+                          {link.title || 'Untitled'}
+                        </div>
                       </TableCell>
-                      <TableCell>
-                        <div className="max-w-xs">
-                          <a 
-                            href={link.originalUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-blue-600 hover:underline"
-                            title={link.originalUrl}
-                          >
-                            {truncateUrl(link.originalUrl)}
-                          </a>
+                      <TableCell className="hidden sm:table-cell">
+                        <div className="max-w-[200px] lg:max-w-[300px] truncate text-xs sm:text-sm">
+                          {link.originalUrl}
                         </div>
                       </TableCell>
                       <TableCell>
-                        <code className="text-sm bg-gray-100 px-2 py-1 rounded">
-                          {link.shortCode}
-                        </code>
-                      </TableCell>
-                      <TableCell>{link.clickCount}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center space-x-1">
-                          {link.isActive ? (
-                            <Badge variant="default">Active</Badge>
-                          ) : (
-                            <Badge variant="secondary">Inactive</Badge>
-                          )}
-                          {isExpired(link.expiresAt) && (
-                            <Badge variant="destructive">Expired</Badge>
-                          )}
+                        <div className="font-mono text-xs sm:text-sm">
+                          {getShortUrl(link.shortCode)}
                         </div>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="text-center text-xs sm:text-sm">
+                        {link.clickCount}
+                      </TableCell>
+                      <TableCell className="hidden md:table-cell text-xs sm:text-sm">
                         {new Date(link.createdAt).toLocaleDateString()}
                       </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end space-x-2">
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => copyToClipboard(link.shortCode)}
-                          >
-                            <Copy className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => window.open(getShortUrl(link.shortCode), '_blank')}
-                          >
-                            <ExternalLink className="h-4 w-4" />
-                          </Button>
-                          {user?.tier !== 'free' && (
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => handleShowQR(link)}
-                              title="Generate QR Code"
-                            >
-                              <QrCode className="h-4 w-4" />
-                            </Button>
+                      <TableCell className="text-center">
+                        <div className="flex flex-col sm:flex-row gap-1 sm:gap-2 justify-center">
+                          {!link.isActive && (
+                            <Badge variant="secondary" className="text-xs">Inactive</Badge>
                           )}
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => router.push(`/dashboard/links/${link.id}`)}
-                          >
-                            <BarChart3 className="h-4 w-4" />
-                          </Button>
-                          
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button size="sm" variant="ghost">
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => router.push(`/dashboard/links/${link.id}`)}>
-                                <Edit className="mr-2 h-4 w-4" />
-                                Edit
-                              </DropdownMenuItem>
-                              <DropdownMenuItem 
-                                onClick={() => handleDelete(link.id)}
-                                className="text-red-600"
-                              >
-                                <Trash2 className="mr-2 h-4 w-4" />
-                                Delete
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+                          {isExpired(link.expiresAt) && (
+                            <Badge variant="destructive" className="text-xs">Expired</Badge>
+                          )}
+                          {link.isActive && !isExpired(link.expiresAt) && (
+                            <Badge variant="default" className="text-xs">Active</Badge>
+                          )}
                         </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-40">
+                            <DropdownMenuItem onClick={() => copyToClipboard(link.shortCode)}>
+                              <Copy className="mr-2 h-4 w-4" />
+                              <span>Copy URL</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => window.open(getShortUrl(link.shortCode), '_blank')}>
+                              <ExternalLink className="mr-2 h-4 w-4" />
+                              <span>Visit</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleShowQR(link)}>
+                              <QrCode className="mr-2 h-4 w-4" />
+                              <span>QR Code</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => router.push(`/dashboard/links/${link.id}`)}>
+                              <BarChart3 className="mr-2 h-4 w-4" />
+                              <span>Analytics</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => router.push(`/dashboard/links/${link.id}/edit`)}>
+                              <Edit className="mr-2 h-4 w-4" />
+                              <span>Edit</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem 
+                              onClick={() => handleDelete(link.id)}
+                              className="text-red-600 focus:text-red-600"
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              <span>Delete</span>
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -322,54 +301,31 @@ export default function LinksPage() {
 
       {/* QR Code Modal */}
       {showQRModal && selectedLink && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold">QR Code</h3>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowQRModal(false)}
-                className="h-6 w-6 p-0"
-              >
-                ×
-              </Button>
-            </div>
-            
-            <div className="text-center space-y-4">
-              <div className="bg-gray-100 dark:bg-gray-700 p-4 rounded-lg">
-                <img
-                  src={generateQRCode(getShortUrl(selectedLink.shortCode))}
-                  alt="QR Code"
-                  className="mx-auto"
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  <strong>Link:</strong> {selectedLink.title || 'Untitled'}
-                </p>
-                <p className="text-sm text-gray-600 dark:text-gray-400 font-mono">
-                  {getShortUrl(selectedLink.shortCode)}
-                </p>
-              </div>
-              
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-sm w-full">
+            <div className="text-center">
+              <h3 className="text-lg font-semibold mb-4">QR Code</h3>
+              <img 
+                src={generateQRCode(getShortUrl(selectedLink.shortCode))} 
+                alt="QR Code" 
+                className="mx-auto mb-4"
+              />
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                {getShortUrl(selectedLink.shortCode)}
+              </p>
               <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    const qrUrl = generateQRCode(getShortUrl(selectedLink.shortCode));
-                    window.open(qrUrl, '_blank');
-                  }}
-                  className="flex-1"
-                >
-                  Download QR
-                </Button>
-                <Button
+                <Button 
                   onClick={() => setShowQRModal(false)}
                   className="flex-1"
                 >
                   Close
+                </Button>
+                <Button 
+                  variant="outline"
+                  onClick={() => copyToClipboard(selectedLink.shortCode)}
+                  className="flex-1"
+                >
+                  Copy URL
                 </Button>
               </div>
             </div>

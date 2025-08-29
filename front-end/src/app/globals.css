@@ -55,5 +55,47 @@
   }
   body {
     @apply bg-background text-foreground;
+    /* Ensure no horizontal scroll on mobile */
+    overflow-x: hidden;
+  }
+  
+  /* Responsive typography */
+  html {
+    font-size: 14px; /* Base font size for mobile */
+  }
+  
+  @media (min-width: 768px) {
+    html {
+      font-size: 16px; /* Larger font size for desktop */
+    }
+  }
+  
+  /* Ensure images are responsive */
+  img {
+    max-width: 100%;
+    height: auto;
+  }
+  
+  /* Responsive tables */
+  table {
+    width: 100%;
+    min-width: 0;
+  }
+  
+  /* Touch-friendly minimum sizes */
+  button, 
+  [role="button"],
+  input[type="button"],
+  input[type="submit"],
+  input[type="reset"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  /* Responsive form elements */
+  input, 
+  textarea, 
+  select {
+    font-size: 16px; /* Prevents zoom on iOS */
   }
 }

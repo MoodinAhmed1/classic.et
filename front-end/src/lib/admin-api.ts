@@ -1,5 +1,4 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "https://back-end.xayrix1.workers.dev"
-
+const API_BASE_URL = "https://back-end.xayrix1.workers.dev"
 class AdminApiError extends Error {
   constructor(
     public status: number,
@@ -20,7 +19,7 @@ async function adminApiRequest<T>(endpoint: string, options: RequestInit = {}): 
     ...options,
   }
 
-  const base = API_BASE_URL || ""
+  const base = API_BASE_URL
   if (!base) {
     throw new Error("API base URL not configured. Set NEXT_PUBLIC_API_BASE_URL in your frontend environment.")
   }
@@ -202,6 +201,8 @@ export const adminApi = {
       pendingPayments: number
     }>(`/api/admin/analytics/system?days=${days}`)
   },
+ 
+
 
   // Subscription Management
   getSubscriptions: async (params?: { limit?: number; offset?: number; status?: string }) => {
@@ -230,6 +231,44 @@ export const adminApi = {
     }>(`/api/admin/transactions?${query}`)
   },
 
+  // Subscription Plans Management
+  getSubscriptionPlans: async () => {
+    return adminApiRequest<{
+      plans: any[]
+    }>('/api/admin/subscription-plans')
+  },
+
+  updateSubscriptionPlan: async (id: string, data: any) => {
+    return adminApiRequest<{
+      plan: any
+    }>(`/api/admin/subscription-plans/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    })
+  },
+
+  createSubscriptionPlan: async (data: any) => {
+    return adminApiRequest<{
+      plan: any
+    }>('/api/admin/subscription-plans', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  },
+
+  deleteSubscriptionPlan: async (id: string) => {
+    return adminApiRequest<{
+      success: boolean
+      message: string
+    }>(`/api/admin/subscription-plans/${id}`, {
+      method: 'DELETE',
+    })
+  },
+
+  downloadTransactions: async (format: 'csv' | 'json' = 'csv') => {
+    return adminApiRequest<Response>(`/api/admin/transactions/download?format=${format}`)
+  },
+
   refundTransaction: async (id: string) => {
     return adminApiRequest<{ transaction: any }>(`/api/admin/transactions/${id}/refund`, {
       method: 'POST',
@@ -251,6 +290,17 @@ export const adminApi = {
     return adminApiRequest<{ setting: any }>(`/api/admin/settings/${key}`, {
       method: "PUT",
       body: JSON.stringify({ value }),
+    })
+  },
+
+  getSystemSettings: async () => {
+    return adminApiRequest<{ settings: any }>("/api/admin/settings/system")
+  },
+
+  updateSystemSettings: async (settings: any) => {
+    return adminApiRequest<{ success: boolean }>("/api/admin/settings/system", {
+      method: "PUT",
+      body: JSON.stringify(settings),
     })
   },
 

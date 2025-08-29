@@ -136,27 +136,29 @@ export default function VerifyEmailPage() {
 
   if (!email) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 dark:from-slate-900 dark:via-purple-900 dark:to-slate-900 p-4">
-        <Card className="w-full max-w-md shadow-2xl border-0">
-          <CardHeader className="space-y-1 text-center pb-8">
-            <div className="flex items-center justify-center mb-6">
-              <Zap className="h-12 w-12 text-blue-600" />
-              <span className="ml-3 text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                LinkShort
-              </span>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 dark:from-slate-900 dark:via-purple-900 dark:to-slate-900 p-4 sm:p-6">
+        <Card className="w-full max-w-sm sm:max-w-md shadow-2xl border-0">
+          <CardHeader className="space-y-1 text-center pb-6 sm:pb-8">
+            <div className="flex items-center justify-center mb-4 sm:mb-6">
+              <div className="relative flex items-center">
+                <Zap className="h-8 w-8 sm:h-12 sm:w-12 text-blue-600" />
+                <span className="ml-2 sm:ml-3 text-2xl sm:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                  LinkShort
+                </span>
+              </div>
             </div>
-            <CardTitle className="text-3xl font-bold">Email Required</CardTitle>
-            <CardDescription className="text-lg text-muted-foreground">
+            <CardTitle className="text-2xl sm:text-3xl font-bold">Email Required</CardTitle>
+            <CardDescription className="text-base sm:text-lg text-muted-foreground">
               Please provide your email address to verify
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="text-center space-y-4">
-              <p className="text-muted-foreground">
+          <CardContent className="px-4 sm:px-6">
+            <div className="text-center space-y-3 sm:space-y-4">
+              <p className="text-sm sm:text-base text-muted-foreground">
                 We need your email address to send you a verification code.
               </p>
               <Link href="/register">
-                <Button className="w-full">
+                <Button className="w-full h-11 sm:h-12 text-sm sm:text-base">
                   Go to Registration
                 </Button>
               </Link>
@@ -168,34 +170,34 @@ export default function VerifyEmailPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 dark:from-slate-900 dark:via-purple-900 dark:to-slate-900 p-4">
-      <Card className="w-full max-w-md shadow-2xl border-0">
-        <CardHeader className="space-y-1 text-center pb-8">
-          <div className="flex items-center justify-center mb-6">
-            <div className="relative">
-              <Zap className="h-12 w-12 text-blue-600" />
-              <span className="ml-3 text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 dark:from-slate-900 dark:via-purple-900 dark:to-slate-900 p-4 sm:p-6">
+      <Card className="w-full max-w-sm sm:max-w-md shadow-2xl border-0">
+        <CardHeader className="space-y-1 text-center pb-6 sm:pb-8">
+          <div className="flex items-center justify-center mb-4 sm:mb-6">
+            <div className="relative flex items-center">
+              <Zap className="h-8 w-8 sm:h-12 sm:w-12 text-blue-600" />
+              <span className="ml-2 sm:ml-3 text-2xl sm:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
                 LinkShort
               </span>
             </div>
           </div>
-          <CardTitle className="text-3xl font-bold">Verify Your Email</CardTitle>
-          <CardDescription className="text-lg text-muted-foreground">
+          <CardTitle className="text-2xl sm:text-3xl font-bold">Verify Your Email</CardTitle>
+          <CardDescription className="text-base sm:text-lg text-muted-foreground">
             Enter the 6-digit code sent to your email
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent className="space-y-4 sm:space-y-6 px-4 sm:px-6">
           {error && (
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
-              <AlertDescription>{error}</AlertDescription>
+              <AlertDescription className="text-sm sm:text-base">{error}</AlertDescription>
             </Alert>
           )}
           
           {success && (
             <Alert className="border-green-200 bg-green-50 text-green-800 dark:border-green-800 dark:bg-green-950 dark:text-green-200">
               <CheckCircle className="h-4 w-4" />
-              <AlertDescription>{success}</AlertDescription>
+              <AlertDescription className="text-sm sm:text-base">{success}</AlertDescription>
             </Alert>
           )}
 

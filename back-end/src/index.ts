@@ -68,23 +68,15 @@ interface Link {
 
 const app = new Hono<{ Bindings: Env }>();
 
-// Updated CORS middleware for cookie-based authentication
+// Updated CORS middleware to allow all origins
 app.use('*', async (c, next) => {
   const origin = c.req.header('Origin') || '';
-  const allowedOrigins = [
-    'http://localhost:3000',
-    'http://localhost:3001',
-    'https://your-frontend-domain.com', // Replace with your actual frontend domain
-    'https://linkshort.vercel.app' // Example production domain
-  ];
-
-  // Must allow exact origin (not *) for credentials to work
-  if (allowedOrigins.includes(origin)) {
-    c.header('Access-Control-Allow-Origin', origin);
-    c.header('Access-Control-Allow-Credentials', 'true');
-    c.header('Access-Control-Allow-Headers', 'Content-Type, X-CSRF-Token');
-    c.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
-  }
+  
+  // Allow all origins
+  c.header('Access-Control-Allow-Origin', origin);
+  c.header('Access-Control-Allow-Credentials', 'true');
+  c.header('Access-Control-Allow-Headers', 'Content-Type, X-CSRF-Token, Authorization');
+  c.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS,PATCH');
 
   // Handle preflight requests
   if (c.req.method === 'OPTIONS') {
@@ -1848,6 +1840,10 @@ app.post('/api/admin/auth/login', async (c) => {
 
 app.get('/api/admin/auth/me', adminAuthMiddleware as any, async (c) => {
   const admin = (c as any).get('adminUser');
+  console.log('Debug - Admin user from middleware:', admin);
+  console.log('Debug - Admin role:', admin.role);
+  console.log('Debug - Admin permissions:', admin.permissions);
+  
   const adminResponse = {
     id: admin.id,
     email: admin.email,
@@ -1859,6 +1855,27 @@ app.get('/api/admin/auth/me', adminAuthMiddleware as any, async (c) => {
     createdAt: admin.created_at,
   };
   return c.json({ adminUser: adminResponse });
+});
+
+// Debug endpoint to check admin user in database
+app.get('/api/admin/debug/user', async (c) => {
+  try {
+    const email = c.req.query('email') || 'admin@yoursite.com';
+    const admin = await (c.env.DB as any)
+      .prepare('SELECT * FROM admin_users WHERE email = ?')
+      .bind(email)
+      .first();
+    
+    return c.json({ 
+      debug: true,
+      email: email,
+      admin: admin,
+      found: !!admin 
+    });
+  } catch (e) {
+    console.error('Debug error:', e);
+    return c.json({ error: 'Debug failed', details: e }, 500);
+  }
 });
 
 app.post('/api/admin/auth/logout', async (c) => {
@@ -1877,6 +1894,7 @@ app.get('/api/admin/analytics/system', adminAuthMiddleware as any, async (c) => 
   try {
     const days = Math.max(1, Math.min(365, parseInt((c.req.query('days') as string) || '30')));
 
+    // Get basic counts
     const totalUsersRow = await (c.env.DB as any).prepare('SELECT COUNT(*) as cnt FROM users').first();
     const totalLinksRow = await (c.env.DB as any).prepare('SELECT COUNT(*) as cnt FROM links').first();
     const totalClicksRow = await (c.env.DB as any).prepare('SELECT SUM(click_count) as cnt FROM links').first();
@@ -2090,6 +2108,8 @@ app.get('/api/admin/users/regular', adminAuthMiddleware as any, async (c) => {
     return c.json({ error: 'Internal server error' }, 500);
   }
 });
+
+
 
 // Admin: list admin users
 app.get('/api/admin/users', adminAuthMiddleware as any, async (c) => {
@@ -2306,30 +2326,196 @@ app.get('/api/admin/subscriptions', adminAuthMiddleware as any, async (c) => {
       .bind(...params, limit, offset)
       .all();
 
-    const subscriptions = (rows?.results || []).map((u: any) => ({
-      id: `sub_${u.id}`,
-      user_id: u.id,
-      user_name: u.name,
-      user_email: u.email,
-      plan_id: u.tier,
-      plan_name: u.tier,
-      tier: u.tier,
-      status: u.subscription_status,
-      billing_cycle: 'monthly',
-      amount: 0,
-      currency: 'ETB',
-      current_period_start: u.current_period_start,
-      current_period_end: u.current_period_end,
-      cancel_at_period_end: !!u.cancel_at_period_end,
-      created_at: u.current_period_start,
-      updated_at: u.current_period_end,
-    }));
+    // Get subscription amounts and plan details from payment transactions
+    const subscriptionAmounts = await (c.env.DB as any)
+      .prepare(`
+        SELECT 
+          t.user_id, 
+          t.amount, 
+          t.billing_cycle, 
+          t.status,
+          t.created_at as payment_date,
+          p.name as plan_name,
+          p.price_monthly,
+          p.price_yearly
+        FROM payment_transactions t
+        LEFT JOIN subscription_plans p ON t.plan_id = p.id
+        WHERE t.status = 'success' 
+        AND t.user_id IN (${rows?.results?.map(() => '?').join(',') || ''})
+        ORDER BY t.created_at DESC
+      `)
+      .bind(...(rows?.results?.map((u: any) => u.id) || []))
+      .all();
 
-    // Basic revenue aggregates (0 until payment rows are integrated)
-    const revenue = { total: 0, monthly: 0, yearly: 0 };
+    // Create a map of user_id to their latest successful payment
+    const userPayments = new Map();
+    (subscriptionAmounts?.results || []).forEach((payment: any) => {
+      if (!userPayments.has(payment.user_id)) {
+        userPayments.set(payment.user_id, payment);
+      }
+    });
+
+    const subscriptions = (rows?.results || []).map((u: any) => {
+      const payment = userPayments.get(u.id);
+      const now = new Date();
+      const paymentDate = payment?.payment_date ? new Date(payment.payment_date) : new Date(u.created_at || now);
+      
+      // Calculate period dates based on billing cycle
+      let periodStart, periodEnd;
+      if (payment?.billing_cycle === 'yearly') {
+        periodStart = new Date(paymentDate);
+        periodEnd = new Date(paymentDate);
+        periodEnd.setFullYear(periodEnd.getFullYear() + 1);
+      } else {
+        periodStart = new Date(paymentDate);
+        periodEnd = new Date(paymentDate);
+        periodEnd.setMonth(periodEnd.getMonth() + 1);
+      }
+
+      return {
+        id: `sub_${u.id}`,
+        user_id: u.id,
+        user_name: u.name || 'Unknown User',
+        user_email: u.email || 'No email',
+        plan_id: u.tier,
+        plan_name: payment?.plan_name || u.tier,
+        tier: u.tier,
+        status: u.subscription_status || 'active',
+        billing_cycle: payment?.billing_cycle || 'monthly',
+        amount: Number(payment?.amount || payment?.price_monthly || 0),
+        currency: 'ETB',
+        current_period_start: u.current_period_start || periodStart.toISOString(),
+        current_period_end: u.current_period_end || periodEnd.toISOString(),
+        cancel_at_period_end: !!u.cancel_at_period_end,
+        created_at: u.created_at || paymentDate.toISOString(),
+        updated_at: u.updated_at || paymentDate.toISOString(),
+      };
+    });
+
+    // Calculate real revenue from successful transactions
+    const revenueData = await (c.env.DB as any)
+      .prepare(`
+        SELECT 
+          SUM(CASE WHEN billing_cycle = 'monthly' THEN amount ELSE 0 END) as monthly_revenue,
+          SUM(CASE WHEN billing_cycle = 'yearly' THEN amount ELSE 0 END) as yearly_revenue,
+          SUM(amount) as total_revenue
+        FROM payment_transactions 
+        WHERE status = 'success'
+      `)
+      .first();
+
+    const revenue = { 
+      total: Number(revenueData?.total_revenue || 0), 
+      monthly: Number(revenueData?.monthly_revenue || 0), 
+      yearly: Number(revenueData?.yearly_revenue || 0) 
+    };
+    
     return c.json({ subscriptions, total, revenue });
   } catch (e) {
     console.error('Admin subscriptions error:', e);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+// Admin: activity logs
+app.get('/api/admin/activity-logs', adminAuthMiddleware as any, async (c) => {
+  try {
+    const limit = Math.max(1, Math.min(200, parseInt((c.req.query('limit') as string) || '50')));
+    const offset = Math.max(0, parseInt((c.req.query('offset') as string) || '0'));
+    const action = (c.req.query('action') as string) || '';
+    const adminUserId = (c.req.query('adminUserId') as string) || '';
+
+    let base = 'FROM admin_activity_logs l LEFT JOIN admin_users a ON l.admin_user_id = a.id WHERE 1=1';
+    const params: any[] = [];
+    
+    if (action) {
+      base += ' AND l.action = ?';
+      params.push(action);
+    }
+    
+    if (adminUserId) {
+      base += ' AND l.admin_user_id = ?';
+      params.push(adminUserId);
+    }
+
+    const totalRow = await (c.env.DB as any).prepare(`SELECT COUNT(*) as cnt ${base}`).bind(...params).first();
+    const total = Number((totalRow as any)?.cnt || 0);
+
+    const rows = await (c.env.DB as any)
+      .prepare(`SELECT l.*, a.name as admin_name, a.email as admin_email ${base} ORDER BY l.created_at DESC LIMIT ? OFFSET ?`)
+      .bind(...params, limit, offset)
+      .all();
+
+    const logs = (rows?.results || []).map((r: any) => ({
+      id: r.id,
+      admin_user_id: r.admin_user_id,
+      admin_name: r.admin_name || 'Unknown Admin',
+      admin_email: r.admin_email || 'No email',
+      action: r.action,
+      resource: r.resource,
+      details: r.details,
+      ip_address: r.ip_address,
+      user_agent: r.user_agent,
+      created_at: r.created_at,
+    }));
+
+    return c.json({ logs, total });
+  } catch (e) {
+    console.error('Admin activity logs error:', e);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+// Admin: system settings
+app.get('/api/admin/settings/system', adminAuthMiddleware as any, async (c) => {
+  try {
+    const rows = await (c.env.DB as any)
+      .prepare(`
+        SELECT setting_key, setting_value, setting_type 
+        FROM system_settings 
+        ORDER BY setting_key
+      `)
+      .all();
+
+    const settings: any = {};
+    (rows?.results || []).forEach((row: any) => {
+      let value = row.setting_value;
+      if (row.setting_type === 'boolean') {
+        value = value === 'true';
+      } else if (row.setting_type === 'number') {
+        value = parseInt(value) || 0;
+      }
+      settings[row.setting_key] = value;
+    });
+
+    return c.json({ settings });
+  } catch (e) {
+    console.error('Admin system settings error:', e);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+app.put('/api/admin/settings/system', adminAuthMiddleware as any, async (c) => {
+  try {
+    const body = await c.req.json();
+    const settings = body.settings || body;
+
+    for (const [key, value] of Object.entries(settings)) {
+      const settingType = typeof value === 'boolean' ? 'boolean' : typeof value === 'number' ? 'number' : 'string';
+      const stringValue = String(value);
+
+      await (c.env.DB as any)
+        .prepare(`
+          INSERT OR REPLACE INTO system_settings (setting_key, setting_value, setting_type, updated_at)
+          VALUES (?, ?, ?, datetime('now'))
+        `)
+        .bind(key, stringValue, settingType)
+        .run();
+    }
+
+    return c.json({ success: true });
+  } catch (e) {
+    console.error('Admin update system settings error:', e);
     return c.json({ error: 'Internal server error' }, 500);
   }
 });
@@ -2506,6 +2692,295 @@ app.post('/api/admin/transactions/:txRef/verify', adminAuthMiddleware as any, as
     return c.json({ error: 'Internal server error' }, 500);
   }
 });
+
+// ============================================================================
+// ADMIN SUBSCRIPTION PLANS MANAGEMENT
+// ============================================================================
+
+/**
+ * Get all subscription plans (admin)
+ */
+app.get('/api/admin/subscription-plans', adminAuthMiddleware as any, async (c) => {
+  try {
+    const plans = await c.env.DB.prepare(`
+      SELECT * FROM subscription_plans ORDER BY price_monthly ASC
+    `).all();
+
+    return c.json({
+      plans: plans.results.map((plan: any) => ({
+        id: plan.id,
+        name: plan.name,
+        tier: plan.tier,
+        priceMonthly: plan.price_monthly,
+        priceYearly: plan.price_yearly,
+        features: JSON.parse(plan.features),
+        limits: JSON.parse(plan.limits),
+        visitorCap: plan.visitor_cap,
+        hasFullAnalytics: plan.has_full_analytics,
+        hasAdvancedCharts: plan.has_advanced_charts,
+        hasPdfDownload: plan.has_pdf_download,
+        createdAt: plan.created_at
+      }))
+    });
+  } catch (error) {
+    console.error('Get subscription plans error:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+/**
+ * Update subscription plan (admin)
+ */
+app.put('/api/admin/subscription-plans/:id', adminAuthMiddleware as any, async (c) => {
+  try {
+    const planId = c.req.param('id');
+    const { name, tier, priceMonthly, priceYearly, features, limits, visitorCap, hasFullAnalytics, hasAdvancedCharts, hasPdfDownload } = await c.req.json();
+
+    // Validate required fields
+    if (!name || !tier || priceMonthly === undefined || priceYearly === undefined) {
+      return c.json({ error: 'Name, tier, priceMonthly, and priceYearly are required' }, 400);
+    }
+
+    // Validate tier
+    if (!['free', 'pro', 'premium'].includes(tier)) {
+      return c.json({ error: 'Invalid tier. Must be free, pro, or premium' }, 400);
+    }
+
+    // Update the plan
+    await c.env.DB.prepare(`
+      UPDATE subscription_plans 
+      SET name = ?, tier = ?, price_monthly = ?, price_yearly = ?, 
+          features = ?, limits = ?, visitor_cap = ?, has_full_analytics = ?, 
+          has_advanced_charts = ?, has_pdf_download = ?
+      WHERE id = ?
+    `).bind(
+      name,
+      tier,
+      priceMonthly,
+      priceYearly,
+      JSON.stringify(features),
+      JSON.stringify(limits),
+      visitorCap || null,
+      hasFullAnalytics || false,
+      hasAdvancedCharts || false,
+      hasPdfDownload || false,
+      planId
+    ).run();
+
+    // Get updated plan
+    const updatedPlan = await c.env.DB.prepare(`
+      SELECT * FROM subscription_plans WHERE id = ?
+    `).bind(planId).first();
+
+    if (!updatedPlan) {
+      return c.json({ error: 'Plan not found' }, 404);
+    }
+
+    return c.json({
+      plan: {
+        id: updatedPlan.id,
+        name: updatedPlan.name,
+        tier: updatedPlan.tier,
+        priceMonthly: updatedPlan.price_monthly,
+        priceYearly: updatedPlan.price_yearly,
+        features: JSON.parse(updatedPlan.features as string),
+        limits: JSON.parse(updatedPlan.limits as string),
+        visitorCap: updatedPlan.visitor_cap,
+        hasFullAnalytics: updatedPlan.has_full_analytics,
+        hasAdvancedCharts: updatedPlan.has_advanced_charts,
+        hasPdfDownload: updatedPlan.has_pdf_download,
+        createdAt: updatedPlan.created_at
+      }
+    });
+  } catch (error) {
+    console.error('Update subscription plan error:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+/**
+ * Create new subscription plan (admin)
+ */
+app.post('/api/admin/subscription-plans', adminAuthMiddleware as any, async (c) => {
+  try {
+    const { name, tier, priceMonthly, priceYearly, features, limits, visitorCap, hasFullAnalytics, hasAdvancedCharts, hasPdfDownload } = await c.req.json();
+
+    // Validate required fields
+    if (!name || !tier || priceMonthly === undefined || priceYearly === undefined) {
+      return c.json({ error: 'Name, tier, priceMonthly, and priceYearly are required' }, 400);
+    }
+
+    // Validate tier
+    if (!['free', 'pro', 'premium'].includes(tier)) {
+      return c.json({ error: 'Invalid tier. Must be free, pro, or premium' }, 400);
+    }
+
+    // Generate unique ID
+    const planId = `plan_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+    // Insert new plan
+    await c.env.DB.prepare(`
+      INSERT INTO subscription_plans (id, name, tier, price_monthly, price_yearly, features, limits, visitor_cap, has_full_analytics, has_advanced_charts, has_pdf_download)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      planId,
+      name,
+      tier,
+      priceMonthly,
+      priceYearly,
+      JSON.stringify(features),
+      JSON.stringify(limits),
+      visitorCap || null,
+      hasFullAnalytics || false,
+      hasAdvancedCharts || false,
+      hasPdfDownload || false
+    ).run();
+
+    // Get created plan
+    const newPlan = await c.env.DB.prepare(`
+      SELECT * FROM subscription_plans WHERE id = ?
+    `).bind(planId).first() as any;
+
+    if (!newPlan) {
+      return c.json({ error: 'Failed to create plan' }, 500);
+    }
+
+    return c.json({
+      plan: {
+        id: newPlan.id,
+        name: newPlan.name,
+        tier: newPlan.tier,
+        priceMonthly: newPlan.price_monthly,
+        priceYearly: newPlan.price_yearly,
+        features: JSON.parse(newPlan.features as string),
+        limits: JSON.parse(newPlan.limits as string),
+        visitorCap: newPlan.visitor_cap,
+        hasFullAnalytics: newPlan.has_full_analytics,
+        hasAdvancedCharts: newPlan.has_advanced_charts,
+        hasPdfDownload: newPlan.has_pdf_download,
+        createdAt: newPlan.created_at
+      }
+    });
+  } catch (error) {
+    console.error('Create subscription plan error:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+/**
+ * Delete subscription plan (admin) - only if no users are subscribed to it
+ */
+app.delete('/api/admin/subscription-plans/:id', adminAuthMiddleware as any, async (c) => {
+  try {
+    const planId = c.req.param('id');
+
+    // Check if any users are subscribed to this plan
+    const usersWithPlan = await c.env.DB.prepare(`
+      SELECT COUNT(*) as count FROM users WHERE tier = ?
+    `).bind(planId).first() as any;
+
+    if (usersWithPlan && (usersWithPlan.count as number) > 0) {
+      return c.json({ 
+        error: 'Cannot delete plan. Users are currently subscribed to this plan.',
+        userCount: usersWithPlan.count as number
+      }, 400);
+    }
+
+    // Delete the plan
+    const result = await c.env.DB.prepare(`
+      DELETE FROM subscription_plans WHERE id = ?
+    `).bind(planId).run();
+
+    if ((result as any).changes === 0) {
+      return c.json({ error: 'Plan not found' }, 404);
+    }
+
+    return c.json({ success: true, message: 'Plan deleted successfully' });
+  } catch (error) {
+    console.error('Delete subscription plan error:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+/**
+ * Download transactions as CSV (admin)
+ */
+app.get('/api/admin/transactions/download', adminAuthMiddleware as any, async (c) => {
+  try {
+    const { format = 'csv' } = c.req.query() as { format?: string };
+    
+    // Get all transactions with user and plan details
+    const transactions = await c.env.DB.prepare(`
+      SELECT 
+        t.id,
+        t.tx_ref,
+        t.amount,
+        t.currency,
+        t.billing_cycle,
+        t.status,
+        t.created_at,
+        t.updated_at,
+        u.name as user_name,
+        u.email as user_email,
+        p.name as plan_name
+      FROM payment_transactions t
+      LEFT JOIN users u ON t.user_id = u.id
+      LEFT JOIN subscription_plans p ON t.plan_id = p.id
+      ORDER BY t.created_at DESC
+    `).all();
+
+    if (format === 'csv') {
+      // Generate CSV
+      const csvHeaders = [
+        'Transaction ID',
+        'User Name',
+        'User Email',
+        'Plan Name',
+        'Amount',
+        'Currency',
+        'Billing Cycle',
+        'Status',
+        'Created At',
+        'Updated At'
+      ];
+
+      const csvRows = transactions.results.map((tx: any) => [
+        tx.tx_ref,
+        tx.user_name || 'N/A',
+        tx.user_email || 'N/A',
+        tx.plan_name || 'N/A',
+        tx.amount,
+        tx.currency,
+        tx.billing_cycle,
+        tx.status,
+        tx.created_at,
+        tx.updated_at
+      ]);
+
+      const csvContent = [csvHeaders, ...csvRows]
+        .map(row => row.map(field => `"${field}"`).join(','))
+        .join('\n');
+
+      return new Response(csvContent, {
+        headers: {
+          'Content-Type': 'text/csv',
+          'Content-Disposition': `attachment; filename="transactions_${new Date().toISOString().split('T')[0]}.csv"`
+        }
+      });
+    } else {
+      // Return JSON
+      return c.json({
+        transactions: transactions.results,
+        total: transactions.results.length,
+        downloadedAt: new Date().toISOString()
+      });
+    }
+  } catch (error) {
+    console.error('Download transactions error:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
 app.get('/api/auth/me', authMiddleware, async (c) => {
   try {
     const payload = c.get('jwtPayload');
@@ -3038,12 +3513,12 @@ app.get('/:shortCode', async (c) => {
     ).bind(shortCode).first() as any;
 
     if (!link) {
-      return c.redirect('https://your-frontend-domain.com/404');
+      return c.redirect('http://localhost:3000/404');
     }
 
     // Check if link is expired
     if (link.expires_at && new Date(link.expires_at) < new Date()) {
-      return c.redirect('https://your-frontend-domain.com/expired');
+      return c.redirect('http://localhost:3000/expired');
     }
 
     // Check visitor cap for the link owner
@@ -3092,7 +3567,7 @@ app.get('/:shortCode', async (c) => {
 
   } catch (error) {
     console.error('Redirect error:', error);
-    return c.redirect('https://your-frontend-domain.com/error');
+    return c.redirect('http://localhost:3000/error');
   }
 });
 

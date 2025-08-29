@@ -248,8 +248,6 @@ export default function AnalyticsPage() {
         </div>
         ` : ''}
 
-
-
         ${Object.keys(analytics.clicksByDevice).length > 0 ? `
         <div style="margin-bottom: 30px;">
           <h2 style="color: #374151; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px;">Device Preferences</h2>
@@ -366,10 +364,10 @@ export default function AnalyticsPage() {
 
   if (!analytics) {
     return (
-      <div className="text-center py-12">
+      <div className="text-center py-8 sm:py-12">
         <BarChart3 className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-        <h2 className="text-2xl font-bold text-gray-900 mb-4">No Analytics Data</h2>
-        <p className="text-gray-600">Create some links to start seeing analytics data.</p>
+        <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mb-4">No Analytics Data</h2>
+        <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">Create some links to start seeing analytics data.</p>
       </div>
     );
   }
@@ -381,17 +379,17 @@ export default function AnalyticsPage() {
   const chartData = prepareChartData();
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex flex-col space-y-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col space-y-3 sm:space-y-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Analytics</h1>
-          <p className="text-gray-600 mt-2">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Analytics</h1>
+          <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mt-1 sm:mt-2">
             Comprehensive analytics for all your shortened links
           </p>
           {analytics.usage.newVisitorsSinceLastVisit > 0 && (
-            <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded-md">
-              <p className="text-sm text-blue-700">
+            <div className="mt-2 p-2 sm:p-3 bg-blue-50 border border-blue-200 rounded-md">
+              <p className="text-xs sm:text-sm text-blue-700">
                 🎉 You have <strong>{analytics.usage.newVisitorsSinceLastVisit}</strong> new visitors since your last visit!
               </p>
             </div>
@@ -399,7 +397,7 @@ export default function AnalyticsPage() {
         </div>
         <div className="flex flex-col space-y-2 sm:flex-row sm:items-center sm:space-y-0 sm:space-x-2">
           <Select value={timeRange} onValueChange={setTimeRange}>
-            <SelectTrigger className="w-full sm:w-32">
+            <SelectTrigger className="w-full sm:w-32 text-sm">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -408,12 +406,12 @@ export default function AnalyticsPage() {
               <SelectItem value="90">Last 90 days</SelectItem>
             </SelectContent>
           </Select>
-          <Button variant="outline" onClick={fetchAnalytics} className="w-full sm:w-auto">
+          <Button variant="outline" onClick={fetchAnalytics} className="w-full sm:w-auto text-sm">
             <RefreshCw className="mr-2 h-4 w-4" />
             Refresh
           </Button>
           {user?.tier === 'premium' && (
-            <Button variant="outline" onClick={downloadPDF} className="w-full sm:w-auto">
+            <Button variant="outline" onClick={downloadPDF} className="w-full sm:w-auto text-sm">
               <Download className="mr-2 h-4 w-4" />
               Export PDF
             </Button>
@@ -425,14 +423,14 @@ export default function AnalyticsPage() {
       {user?.tier === 'premium' ? (
         <Card>
           <CardHeader>
-            <CardTitle>Analytics View</CardTitle>
-            <CardDescription>Choose how to view your analytics data</CardDescription>
+            <CardTitle className="text-lg sm:text-xl">Analytics View</CardTitle>
+            <CardDescription className="text-sm">Choose how to view your analytics data</CardDescription>
           </CardHeader>
           <CardContent>
             <Tabs defaultValue={analyticsViewMode} onValueChange={(value) => setAnalyticsViewMode(value as 'graphical' | 'standard')}>
               <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="graphical">Graphical View</TabsTrigger>
-                <TabsTrigger value="standard">Standard View</TabsTrigger>
+                <TabsTrigger value="graphical" className="text-xs sm:text-sm">Graphical View</TabsTrigger>
+                <TabsTrigger value="standard" className="text-xs sm:text-sm">Standard View</TabsTrigger>
               </TabsList>
             </Tabs>
           </CardContent>
@@ -440,22 +438,22 @@ export default function AnalyticsPage() {
       ) : (
         <Card>
           <CardHeader>
-            <CardTitle>Analytics View</CardTitle>
-            <CardDescription>Upgrade to Premium for graphical analytics</CardDescription>
+            <CardTitle className="text-lg sm:text-xl">Analytics View</CardTitle>
+            <CardDescription className="text-sm">Upgrade to Premium for graphical analytics</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center justify-between p-4 border rounded-lg">
-              <div className="flex items-center space-x-4">
-                <Lock className="h-8 w-8 text-gray-400" />
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 sm:p-4 border rounded-lg space-y-3 sm:space-y-0">
+              <div className="flex items-center space-x-3 sm:space-x-4">
+                <Lock className="h-6 w-6 sm:h-8 sm:w-8 text-gray-400 flex-shrink-0" />
                 <div>
-                  <h3 className="font-medium">Graphical Analytics</h3>
-                  <p className="text-sm text-muted-foreground">
+                  <h3 className="font-medium text-sm sm:text-base">Graphical Analytics</h3>
+                  <p className="text-xs sm:text-sm text-muted-foreground">
                     Visualize your data with charts and graphs
                   </p>
                 </div>
               </div>
-              <Link href="/dashboard/subscription">
-                <Button size="sm">
+              <Link href="/dashboard/subscription" className="w-full sm:w-auto">
+                <Button size="sm" className="w-full sm:w-auto text-sm">
                   Upgrade to Premium
                 </Button>
               </Link>
@@ -465,36 +463,36 @@ export default function AnalyticsPage() {
       )}
 
       {/* Overview Stats */}
-      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Links</CardTitle>
-            <BarChart3 className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-xs sm:text-sm font-medium">Total Links</CardTitle>
+            <BarChart3 className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalLinks}</div>
+            <div className="text-lg sm:text-xl lg:text-2xl font-bold">{totalLinks}</div>
             <p className="text-xs text-muted-foreground">All time</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Clicks</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-xs sm:text-sm font-medium">Total Clicks</CardTitle>
+            <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalClicks}</div>
+            <div className="text-lg sm:text-xl lg:text-2xl font-bold">{totalClicks}</div>
             <p className="text-xs text-muted-foreground">All time</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Period Clicks</CardTitle>
-            <Calendar className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-xs sm:text-sm font-medium">Period Clicks</CardTitle>
+            <Calendar className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
+            <div className="text-lg sm:text-xl lg:text-2xl font-bold">
               {analytics ? Object.values(analytics.clicksByDate).reduce((sum, clicks) => sum + clicks, 0) : 0}
             </div>
             <p className="text-xs text-muted-foreground">Last {timeRange} days</p>
@@ -503,11 +501,11 @@ export default function AnalyticsPage() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Avg. per Link</CardTitle>
-            <BarChart3 className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-xs sm:text-sm font-medium">Avg. per Link</CardTitle>
+            <BarChart3 className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{avgPerLink}</div>
+            <div className="text-lg sm:text-xl lg:text-2xl font-bold">{avgPerLink}</div>
             <p className="text-xs text-muted-foreground">Clicks per link</p>
           </CardContent>
         </Card>
@@ -515,21 +513,21 @@ export default function AnalyticsPage() {
 
       {/* Visitor Cap Warning */}
       {analytics && analytics.usage.visitorCap && analytics.usage.visitorCap.limit && (
-        <Card className="border-orange-200 bg-orange-50">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <Lock className="h-5 w-5 text-orange-600" />
+        <Card className="border-orange-200 bg-orange-50 dark:bg-orange-900/20 dark:border-orange-800">
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-3 sm:space-y-0">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <Lock className="h-4 w-4 sm:h-5 sm:w-5 text-orange-600 flex-shrink-0" />
                 <div>
-                  <h4 className="font-medium text-orange-900">Visitor Cap Active</h4>
-                  <p className="text-sm text-orange-700">
+                  <h4 className="font-medium text-sm sm:text-base text-orange-900 dark:text-orange-100">Visitor Cap Active</h4>
+                  <p className="text-xs sm:text-sm text-orange-700 dark:text-orange-300">
                     You're tracking visitors with a cap of {analytics.usage.visitorCap.limit.toLocaleString()}. 
                     Upgrade to Pro or Premium for higher limits.
                   </p>
                 </div>
               </div>
-              <Link href="/dashboard/subscription">
-                <Button size="sm" className="bg-orange-600 hover:bg-orange-700">
+              <Link href="/dashboard/subscription" className="w-full sm:w-auto">
+                <Button size="sm" className="w-full sm:w-auto bg-orange-600 hover:bg-orange-700 text-sm">
                   <ArrowUpRight className="mr-2 h-4 w-4" />
                   Upgrade
                 </Button>
@@ -539,40 +537,40 @@ export default function AnalyticsPage() {
         </Card>
       )}
 
-      <Tabs defaultValue="overview" className="space-y-6">
+      <Tabs defaultValue="overview" className="space-y-4 sm:space-y-6">
         <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="performance">Performance</TabsTrigger>
-          <TabsTrigger value="audience">Audience</TabsTrigger>
+          <TabsTrigger value="overview" className="text-xs sm:text-sm">Overview</TabsTrigger>
+          <TabsTrigger value="performance" className="text-xs sm:text-sm">Performance</TabsTrigger>
+          <TabsTrigger value="audience" className="text-xs sm:text-sm">Audience</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview" className="space-y-6">
+        <TabsContent value="overview" className="space-y-4 sm:space-y-6">
           {!analytics ? (
-            <div className="text-center py-12">
+            <div className="text-center py-8 sm:py-12">
               <Loader2 className="h-12 w-12 mx-auto mb-4 animate-spin text-gray-400" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">Loading Analytics</h3>
-              <p className="text-gray-600">Please wait while we fetch your analytics data...</p>
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">Loading Analytics</h3>
+              <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">Please wait while we fetch your analytics data...</p>
             </div>
           ) : (
-          <div className="grid gap-6 grid-cols-1 md:grid-cols-2">
+          <div className="grid gap-4 sm:gap-6 grid-cols-1 lg:grid-cols-2">
             {/* Clicks Over Time */}
-            <Card className="md:col-span-2">
+            <Card className="lg:col-span-2">
               <CardHeader>
-                <CardTitle>Clicks Over Time</CardTitle>
-                <CardDescription>Click trends over the selected period</CardDescription>
+                <CardTitle className="text-lg sm:text-xl">Clicks Over Time</CardTitle>
+                <CardDescription className="text-sm">Click trends over the selected period</CardDescription>
               </CardHeader>
               <CardContent>
                 {!analytics || Object.keys(analytics.clicksByDate).length === 0 ? (
                   <div className="text-center py-8">
                     <Calendar className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">No Data Available</h3>
-                    <p className="text-gray-600 mb-4">No clicks recorded in the selected time period.</p>
+                    <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No Data Available</h3>
+                    <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mb-4">No clicks recorded in the selected time period.</p>
                   </div>
                 ) : (
                   <>
                     {user?.tier === 'premium' && analytics.restrictions.canSeeAdvancedCharts && analyticsViewMode === 'graphical' ? (
                       // Advanced Line Chart for Premium users
-                      <div className="h-80">
+                      <div className="h-60 sm:h-80">
                         <ResponsiveContainer width="100%" height="100%">
                           <LineChart data={chartData.clicksByDate}>
                             <CartesianGrid strokeDasharray="3 3" />
@@ -586,536 +584,207 @@ export default function AnalyticsPage() {
                       </div>
                     ) : (
                       // Simple bar chart for all users
-                <div className="space-y-2">
-                    {chartData.clicksByDate.map((item) => (
-                      <div key={item.date} className="flex items-center justify-between py-2">
-                        <span className="text-sm">{item.date}</span>
-                        <div className="flex items-center space-x-2">
-                          <div className="w-32 bg-gray-200 rounded-full h-2">
-                            <div 
-                              className="bg-blue-600 h-2 rounded-full" 
-                              style={{ 
-                                width: `${Math.max(10, chartData.clicksByDate.length > 0 ? (item.clicks / Math.max(...chartData.clicksByDate.map(d => d.clicks))) * 100 : 0)}%` 
-                              }}
-                            ></div>
+                      <div className="space-y-2">
+                        {chartData.clicksByDate.map((item) => (
+                          <div key={item.date} className="flex items-center justify-between py-2">
+                            <span className="text-xs sm:text-sm">{item.date}</span>
+                            <div className="flex items-center space-x-2">
+                              <div className="w-20 sm:w-32 bg-gray-200 rounded-full h-2">
+                                <div 
+                                  className="bg-blue-600 h-2 rounded-full" 
+                                  style={{ 
+                                    width: `${Math.max(10, chartData.clicksByDate.length > 0 ? (item.clicks / Math.max(...chartData.clicksByDate.map(d => d.clicks))) * 100 : 0)}%` 
+                                  }}
+                                ></div>
+                              </div>
+                              <span className="text-xs sm:text-sm font-medium w-8 sm:w-12 text-right">{item.clicks}</span>
+                            </div>
                           </div>
-                          <span className="text-sm font-medium w-8 text-right">{item.clicks}</span>
-                        </div>
+                        ))}
                       </div>
-                    ))}
-                </div>
                     )}
                   </>
                 )}
               </CardContent>
             </Card>
 
-            {/* Top Links */}
+            {/* Top Performing Links */}
             <Card>
               <CardHeader>
-                <CardTitle>Top Performing Links</CardTitle>
-                <CardDescription>Your most clicked links</CardDescription>
+                <CardTitle className="text-lg sm:text-xl">Top Performing Links</CardTitle>
+                <CardDescription className="text-sm">Your most clicked links</CardDescription>
               </CardHeader>
               <CardContent>
-                {!analytics || analytics.links.length === 0 ? (
-                  <div className="text-center py-8">
-                    <BarChart3 className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">No Links Available</h3>
-                    <p className="text-gray-600 mb-4">Create your first link to see performance data.</p>
-                  </div>
-                ) : (
                 <div className="space-y-3">
                   {analytics.links
                     .sort((a, b) => b.clickCount - a.clickCount)
                     .slice(0, 5)
                     .map((link, index) => (
-                    <div key={link.id} className="flex items-center justify-between">
-                      <div className="flex items-center space-x-3">
-                        <div className="flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 text-blue-600 text-xs font-medium">
-                          {index + 1}
+                      <div key={link.id} className="flex items-center justify-between p-2 border rounded-lg">
+                        <div className="flex items-center space-x-2 sm:space-x-3">
+                          <div className="w-6 h-6 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
+                            <span className="text-xs font-medium text-blue-600 dark:text-blue-400">{index + 1}</span>
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs sm:text-sm font-medium truncate">{link.title || 'Untitled'}</p>
+                            <p className="text-xs text-muted-foreground font-mono">/{link.shortCode}</p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-sm font-medium">{link.title}</p>
-                          <p className="text-xs text-muted-foreground font-mono">/{link.shortCode}</p>
+                        <div className="text-right">
+                          <p className="text-sm font-medium">{link.clickCount}</p>
+                          <p className="text-xs text-muted-foreground">clicks</p>
                         </div>
                       </div>
-                        <span className="text-sm font-medium">{link.clickCount}</span>
+                    ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Geographic Distribution */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg sm:text-xl">Geographic Distribution</CardTitle>
+                <CardDescription className="text-sm">Clicks by country</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {Object.keys(analytics.clicksByCountry).length === 0 ? (
+                  <div className="text-center py-8">
+                    <Globe className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                    <p className="text-sm text-gray-600 dark:text-gray-400">No geographic data available</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {Object.entries(analytics.clicksByCountry)
+                      .sort(([,a], [,b]) => b - a)
+                      .slice(0, 5)
+                      .map(([country, clicks]) => (
+                        <div key={country} className="flex items-center justify-between p-2 border rounded-lg">
+                          <div className="flex items-center space-x-2 sm:space-x-3">
+                            <Globe className="h-4 w-4 text-blue-600" />
+                            <span className="text-xs sm:text-sm">{countryCodeToName(country)}</span>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-sm font-medium">{clicks}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {Math.round((clicks / analytics.totalClicks) * 100)}%
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="performance" className="space-y-4 sm:space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg sm:text-xl">Link Performance</CardTitle>
+              <CardDescription className="text-sm">Detailed performance of your links</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {analytics.links
+                  .sort((a, b) => b.clickCount - a.clickCount)
+                  .map((link) => (
+                    <div key={link.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 border rounded-lg space-y-2 sm:space-y-0">
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-medium text-sm sm:text-base truncate">{link.title || 'Untitled'}</h3>
+                        <p className="text-xs text-muted-foreground font-mono">/{link.shortCode}</p>
+                      </div>
+                      <div className="flex items-center space-x-4 text-sm">
+                        <div className="text-center">
+                          <p className="font-medium">{link.clickCount}</p>
+                          <p className="text-xs text-muted-foreground">Total</p>
+                        </div>
+                        <div className="text-center">
+                          <p className="font-medium">{link.clicksInPeriod}</p>
+                          <p className="text-xs text-muted-foreground">Period</p>
+                        </div>
+                      </div>
                     </div>
                   ))}
-                </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Top Countries */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Top Countries</CardTitle>
-                <CardDescription>Clicks by country</CardDescription>
-                {analytics && analytics.restrictions.topCountriesHidden > 0 && (
-                  <div className="text-xs text-orange-600 bg-orange-50 p-2 rounded">
-                    Top {analytics.restrictions.topCountriesHidden} countries hidden for free users
-                  </div>
-                )}
-              </CardHeader>
-              <CardContent>
-                {!analytics || Object.keys(analytics.clicksByCountry).length === 0 ? (
-                  <div className="text-center py-8">
-                    <Lock className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">Country Analytics Locked</h3>
-                    <p className="text-gray-600 mb-4">
-                      {user?.tier === 'free' 
-                        ? 'Upgrade to Pro or Premium to see country analytics.'
-                        : 'Upgrade to Premium to see advanced country analytics.'
-                      }
-                    </p>
-                    <Link href="/dashboard/subscription">
-                      <Button>
-                        <ArrowUpRight className="mr-2 h-4 w-4" />
-                        {user?.tier === 'free' ? 'Upgrade Plan' : 'Upgrade to Premium'}
-                      </Button>
-                    </Link>
-                  </div>
-                ) : (
-                  <>
-                    {user?.tier === 'premium' && analytics.restrictions.canSeeAdvancedCharts && analyticsViewMode === 'graphical' ? (
-                      // Advanced Bar Chart for Premium users
-                      <div className="h-64">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <BarChart data={chartData.clicksByCountry}>
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis dataKey="country" />
-                            <YAxis />
-                            <Tooltip />
-                            <Bar dataKey="clicks" fill="#8b5cf6" />
-                          </BarChart>
-                        </ResponsiveContainer>
-                      </div>
-                    ) : (
-                      // Simple list for Pro users
-                <div className="space-y-3">
-                  {Object.entries(analytics.clicksByCountry || {})
-                    .sort(([,a], [,b]) => b - a)
-                    .map(([country, clicks]) => (
-                      <div key={country} className="flex items-center justify-between">
-                        <div className="flex items-center space-x-2">
-                          <Globe className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-sm">{countryCodeToName(country)}</span>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <div className="w-20 bg-gray-200 rounded-full h-2">
-                            <div 
-                              className="bg-purple-600 h-2 rounded-full" 
-                              style={{ 
-                                      width: `${analytics.totalClicks > 0 ? (clicks / analytics.totalClicks) * 100 : 0}%` 
-                              }}
-                            ></div>
-                          </div>
-                          <span className="text-sm font-medium w-8 text-right">{clicks}</span>
-                        </div>
-                      </div>
-                    ))}
-                </div>
-                    )}
-                  </>
-                )}
-              </CardContent>
-            </Card>
-
-
-
-            {/* Device Types */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Device Types</CardTitle>
-                <CardDescription>Clicks by device type</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {!analytics || analytics.restrictions.devicesHidden ? (
-                  <div className="text-center py-8">
-                    <Lock className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">Device Analytics Locked</h3>
-                    <p className="text-gray-600 mb-4">
-                      {user?.tier === 'free' 
-                        ? 'Upgrade to Pro or Premium to see device analytics.'
-                        : 'Upgrade to Premium to see advanced device analytics.'
-                      }
-                    </p>
-                    <Link href="/dashboard/subscription">
-                      <Button>
-                        <ArrowUpRight className="mr-2 h-4 w-4" />
-                        {user?.tier === 'free' ? 'Upgrade Plan' : 'Upgrade to Premium'}
-                      </Button>
-                    </Link>
-                  </div>
-                ) : (
-                  <>
-                    {user?.tier === 'premium' && analytics.restrictions.canSeeAdvancedCharts && analyticsViewMode === 'graphical' ? (
-                      // Advanced Pie Chart for Premium users
-                      <div className="h-64">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <PieChart>
-                            <Pie
-                              data={chartData.clicksByDevice}
-                              cx="50%"
-                              cy="50%"
-                              labelLine={false}
-                              label={({ device, percent }) => `${device} ${(percent * 100).toFixed(0)}%`}
-                              outerRadius={80}
-                              fill="#8884d8"
-                              dataKey="clicks"
-                            >
-                              {chartData.clicksByDevice.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'][index % 5]} />
-                              ))}
-                            </Pie>
-                            <Tooltip />
-                          </PieChart>
-                        </ResponsiveContainer>
-                      </div>
-                    ) : (
-                      // Simple list for Pro users
-                <div className="space-y-3">
-                  {Object.entries(analytics.clicksByDevice || {})
-                    .sort(([,a], [,b]) => b - a)
-                    .map(([device, clicks]) => (
-                      <div key={device} className="flex items-center justify-between">
-                        <div className="flex items-center space-x-2">
-                          {getDeviceIcon(device)}
-                          <span className="text-sm capitalize">{device}</span>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <div className="w-20 bg-gray-200 rounded-full h-2">
-                            <div 
-                              className="bg-green-600 h-2 rounded-full" 
-                              style={{ 
-                                      width: `${analytics.totalClicks > 0 ? (clicks / analytics.totalClicks) * 100 : 0}%` 
-                              }}
-                            ></div>
-                          </div>
-                          <span className="text-sm font-medium w-8 text-right">{clicks}</span>
-                        </div>
-                      </div>
-                    ))}
-                </div>
-                    )}
-                  </>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Top Browsers */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Top Browsers</CardTitle>
-                <CardDescription>Clicks by browser</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {!analytics || analytics.restrictions.browsersHidden ? (
-                  <div className="text-center py-8">
-                    <Lock className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">Browser Analytics Locked</h3>
-                    <p className="text-gray-600 mb-4">Upgrade to Pro or Premium to see browser analytics.</p>
-                    <Link href="/dashboard/subscription">
-                      <Button>
-                        <ArrowUpRight className="mr-2 h-4 w-4" />
-                        Upgrade Plan
-                      </Button>
-                    </Link>
-                  </div>
-                ) : (
-                  <>
-                    {user?.tier === 'premium' && analytics.restrictions.canSeeAdvancedCharts && analyticsViewMode === 'graphical' ? (
-                      // Advanced Horizontal Bar Chart for Premium users
-                      <div className="h-64">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <BarChart data={chartData.clicksByBrowser} layout="horizontal">
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis type="number" />
-                            <YAxis dataKey="browser" type="category" width={80} />
-                            <Tooltip />
-                            <Bar dataKey="clicks" fill="#f59e0b" />
-                          </BarChart>
-                        </ResponsiveContainer>
-                      </div>
-                    ) : (
-                      // Simple list for Pro users
-                <div className="space-y-3">
-                  {Object.entries(analytics.clicksByBrowser || {})
-                    .sort(([,a], [,b]) => b - a)
-                    .map(([browser, clicks]) => (
-                      <div key={browser} className="flex items-center justify-between">
-                        <div className="flex items-center space-x-2">
-                          <Globe className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-sm">{browser}</span>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <div className="w-20 bg-gray-200 rounded-full h-2">
-                            <div 
-                              className="bg-orange-600 h-2 rounded-full" 
-                              style={{ 
-                                      width: `${analytics.totalClicks > 0 ? (clicks / analytics.totalClicks) * 100 : 0}%` 
-                              }}
-                            ></div>
-                          </div>
-                          <span className="text-sm font-medium w-8 text-right">{clicks}</span>
-                        </div>
-                      </div>
-                    ))}
-                </div>
-                    )}
-                  </>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        )}
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
-        <TabsContent value="performance" className="space-y-6">
-          {!analytics ? (
-            <div className="text-center py-12">
-              <Loader2 className="h-12 w-12 mx-auto mb-4 animate-spin text-gray-400" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">Loading Analytics</h3>
-              <p className="text-gray-600">Please wait while we fetch your analytics data...</p>
-            </div>
-          ) : (
-          <div className="grid gap-6 grid-cols-1 md:grid-cols-2">
-            {/* Top Countries */}
+        <TabsContent value="audience" className="space-y-4 sm:space-y-6">
+          <div className="grid gap-4 sm:gap-6 grid-cols-1 lg:grid-cols-2">
+            {/* Device Distribution */}
             <Card>
               <CardHeader>
-                <CardTitle>Top Countries</CardTitle>
-                <CardDescription>Clicks by country</CardDescription>
+                <CardTitle className="text-lg sm:text-xl">Device Distribution</CardTitle>
+                <CardDescription className="text-sm">Clicks by device type</CardDescription>
               </CardHeader>
               <CardContent>
-                {!analytics || Object.keys(analytics.clicksByCountry).length === 0 ? (
+                {Object.keys(analytics.clicksByDevice).length === 0 ? (
                   <div className="text-center py-8">
-                    <Lock className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">Country Analytics Locked</h3>
-                    <p className="text-gray-600 mb-4">
-                      {user?.tier === 'free' 
-                        ? 'Upgrade to Pro or Premium to see country analytics.'
-                        : 'Upgrade to Premium to see advanced country analytics.'
-                      }
-                    </p>
-                    <Link href="/dashboard/subscription">
-                      <Button>
-                        <ArrowUpRight className="mr-2 h-4 w-4" />
-                        {user?.tier === 'free' ? 'Upgrade Plan' : 'Upgrade to Premium'}
-                      </Button>
-                    </Link>
+                    <Smartphone className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                    <p className="text-sm text-gray-600 dark:text-gray-400">No device data available</p>
                   </div>
                 ) : (
-                  <>
-                    {user?.tier === 'premium' && analytics.restrictions.canSeeAdvancedCharts && analyticsViewMode === 'graphical' ? (
-                      // Advanced Bar Chart for Premium users
-                      <div className="h-64">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <BarChart data={chartData.clicksByCountry}>
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis dataKey="country" />
-                            <YAxis />
-                            <Tooltip />
-                            <Bar dataKey="clicks" fill="#8b5cf6" />
-                          </BarChart>
-                        </ResponsiveContainer>
-                      </div>
-                    ) : (
-                      // Simple list for Pro users
-                <div className="space-y-3">
-                  {Object.entries(analytics.clicksByCountry || {})
-                    .sort(([,a], [,b]) => b - a)
-                    .map(([country, clicks]) => (
-                      <div key={country} className="flex items-center justify-between">
-                        <div className="flex items-center space-x-2">
-                          <Globe className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-sm">{countryCodeToName(country)}</span>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <div className="w-20 bg-gray-200 rounded-full h-2">
-                            <div 
-                              className="bg-purple-600 h-2 rounded-full" 
-                              style={{ 
-                                      width: `${analytics.totalClicks > 0 ? (clicks / analytics.totalClicks) * 100 : 0}%` 
-                              }}
-                            ></div>
+                  <div className="space-y-3">
+                    {Object.entries(analytics.clicksByDevice)
+                      .sort(([,a], [,b]) => b - a)
+                      .map(([device, clicks]) => (
+                        <div key={device} className="flex items-center justify-between p-2 border rounded-lg">
+                          <div className="flex items-center space-x-2 sm:space-x-3">
+                            {getDeviceIcon(device)}
+                            <span className="text-xs sm:text-sm capitalize">{device}</span>
                           </div>
-                          <span className="text-sm font-medium w-8 text-right">{clicks}</span>
+                          <div className="text-right">
+                            <p className="text-sm font-medium">{clicks}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {Math.round((clicks / analytics.totalClicks) * 100)}%
+                            </p>
+                          </div>
                         </div>
-                      </div>
-                    ))}
-                </div>
-                    )}
-                  </>
+                      ))}
+                  </div>
                 )}
               </CardContent>
             </Card>
 
-            {/* Top Browsers */}
+            {/* Browser Distribution */}
             <Card>
               <CardHeader>
-                <CardTitle>Top Browsers</CardTitle>
-                <CardDescription>Clicks by browser</CardDescription>
+                <CardTitle className="text-lg sm:text-xl">Browser Distribution</CardTitle>
+                <CardDescription className="text-sm">Clicks by browser</CardDescription>
               </CardHeader>
               <CardContent>
-                {!analytics || analytics.restrictions.browsersHidden ? (
+                {Object.keys(analytics.clicksByBrowser).length === 0 ? (
                   <div className="text-center py-8">
-                    <Lock className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">Browser Analytics Locked</h3>
-                    <p className="text-gray-600 mb-4">Upgrade to Pro or Premium to see browser analytics.</p>
-                    <Link href="/dashboard/subscription">
-                      <Button>
-                        <ArrowUpRight className="mr-2 h-4 w-4" />
-                        Upgrade Plan
-                      </Button>
-                    </Link>
+                    <Globe className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                    <p className="text-sm text-gray-600 dark:text-gray-400">No browser data available</p>
                   </div>
                 ) : (
-                  <>
-                    {user?.tier === 'premium' && analytics.restrictions.canSeeAdvancedCharts && analyticsViewMode === 'graphical' ? (
-                      // Advanced Horizontal Bar Chart for Premium users
-                      <div className="h-64">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <BarChart data={chartData.clicksByBrowser} layout="horizontal">
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis type="number" />
-                            <YAxis dataKey="browser" type="category" width={80} />
-                            <Tooltip />
-                            <Bar dataKey="clicks" fill="#f59e0b" />
-                          </BarChart>
-                        </ResponsiveContainer>
-                      </div>
-                    ) : (
-                      // Simple list for Pro users
-                <div className="space-y-3">
-                  {Object.entries(analytics.clicksByBrowser || {})
-                    .sort(([,a], [,b]) => b - a)
-                    .map(([browser, clicks]) => (
-                      <div key={browser} className="flex items-center justify-between">
-                        <div className="flex items-center space-x-2">
-                          <Globe className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-sm">{browser}</span>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <div className="w-20 bg-gray-200 rounded-full h-2">
-                            <div 
-                              className="bg-orange-600 h-2 rounded-full" 
-                              style={{ 
-                                      width: `${analytics.totalClicks > 0 ? (clicks / analytics.totalClicks) * 100 : 0}%` 
-                              }}
-                            ></div>
+                  <div className="space-y-3">
+                    {Object.entries(analytics.clicksByBrowser)
+                      .sort(([,a], [,b]) => b - a)
+                      .slice(0, 8)
+                      .map(([browser, clicks]) => (
+                        <div key={browser} className="flex items-center justify-between p-2 border rounded-lg">
+                          <div className="flex items-center space-x-2 sm:space-x-3">
+                            <Globe className="h-4 w-4 text-blue-600" />
+                            <span className="text-xs sm:text-sm">{browser}</span>
                           </div>
-                          <span className="text-sm font-medium w-8 text-right">{clicks}</span>
+                          <div className="text-right">
+                            <p className="text-sm font-medium">{clicks}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {Math.round((clicks / analytics.totalClicks) * 100)}%
+                            </p>
+                          </div>
                         </div>
-                      </div>
-                    ))}
-                </div>
-                    )}
-                  </>
+                      ))}
+                  </div>
                 )}
               </CardContent>
             </Card>
           </div>
-        )}
-        </TabsContent>
-
-        <TabsContent value="audience" className="space-y-6">
-          {!analytics ? (
-            <div className="text-center py-12">
-              <Loader2 className="h-12 w-12 mx-auto mb-4 animate-spin text-gray-400" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">Loading Analytics</h3>
-              <p className="text-gray-600">Please wait while we fetch your analytics data...</p>
-            </div>
-          ) : (
-          <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-            <Card>
-              <CardHeader>
-                <CardTitle>Geographic Distribution</CardTitle>
-                <CardDescription>Where your audience is located</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {!analytics || Object.keys(analytics.clicksByCountry).length === 0 ? (
-                  <div className="text-center py-4">
-                    <Lock className="h-8 w-8 mx-auto mb-2 text-gray-400" />
-                    <p className="text-sm text-gray-600">Upgrade to see country data</p>
-                  </div>
-                ) : (
-                <div className="space-y-2">
-                  {Object.entries(analytics.clicksByCountry || {})
-                    .sort(([,a], [,b]) => b - a)
-                    .map(([country, clicks]) => (
-                      <div key={country} className="flex justify-between text-sm">
-                        <span>{countryCodeToName(country)}</span>
-                        <span className="font-medium">
-                            {analytics.totalClicks > 0 ? Math.round((clicks / analytics.totalClicks) * 100) : 0}%
-                        </span>
-                      </div>
-                    ))}
-                </div>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Device Preferences</CardTitle>
-                <CardDescription>How users access your links</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {!analytics || analytics.restrictions.devicesHidden ? (
-                  <div className="text-center py-4">
-                    <Lock className="h-8 w-8 mx-auto mb-2 text-gray-400" />
-                    <p className="text-sm text-gray-600">Upgrade to see device data</p>
-                  </div>
-                ) : (
-                <div className="space-y-2">
-                  {Object.entries(analytics.clicksByDevice || {})
-                    .sort(([,a], [,b]) => b - a)
-                    .map(([device, clicks]) => (
-                      <div key={device} className="flex justify-between text-sm">
-                        <div className="flex items-center space-x-2">
-                          {getDeviceIcon(device)}
-                          <span className="capitalize">{device}</span>
-                        </div>
-                        <span className="font-medium">
-                            {analytics.totalClicks > 0 ? Math.round((clicks / analytics.totalClicks) * 100) : 0}%
-                        </span>
-                      </div>
-                    ))}
-                </div>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Browser Usage</CardTitle>
-                <CardDescription>Popular browsers among your audience</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {!analytics || analytics.restrictions.browsersHidden ? (
-                  <div className="text-center py-4">
-                    <Lock className="h-8 w-8 mx-auto mb-2 text-gray-400" />
-                    <p className="text-sm text-gray-600">Upgrade to see browser data</p>
-                  </div>
-                ) : (
-                <div className="space-y-2">
-                  {Object.entries(analytics.clicksByBrowser || {})
-                    .sort(([,a], [,b]) => b - a)
-                    .map(([browser, clicks]) => (
-                      <div key={browser} className="flex justify-between text-sm">
-                        <span>{browser}</span>
-                        <span className="font-medium">
-                            {analytics.totalClicks > 0 ? Math.round((clicks / analytics.totalClicks) * 100) : 0}%
-                        </span>
-                      </div>
-                    ))}
-                </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        )}
         </TabsContent>
       </Tabs>
     </div>

@@ -15,11 +15,13 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { useAuth } from '@/contexts/auth-context';
 import { useRouter } from 'next/navigation';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 export function DashboardHeader() {
   const { user, logout } = useAuth();
   const router = useRouter();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const isMobile = useIsMobile();
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
@@ -47,7 +49,11 @@ export function DashboardHeader() {
   };
 
   return (
-    <div className="absolute top-6 right-8 z-50 flex items-center space-x-3 sm:space-x-4">
+    <div className={`absolute z-50 flex items-center space-x-2 sm:space-x-3 ${
+      isMobile 
+        ? 'top-4 right-4' 
+        : 'top-6 right-8'
+    }`}>
       {/* Theme Toggle */}
       <div className="flex-shrink-0">
         <ThemeToggle />
@@ -59,22 +65,30 @@ export function DashboardHeader() {
           <DropdownMenuTrigger asChild>
             <Button
               variant="ghost"
-              className="relative h-10 w-10 rounded-full bg-white dark:bg-gray-800 shadow-lg hover:shadow-xl transition-all duration-200"
+              className={`relative rounded-full bg-white dark:bg-gray-800 shadow-lg hover:shadow-xl transition-all duration-200 ${
+                isMobile ? 'h-9 w-9' : 'h-10 w-10'
+              }`}
             >
-              <Avatar className="h-10 w-10">
-                <AvatarFallback className="bg-blue-600 text-white font-medium">
+              <Avatar className={isMobile ? 'h-9 w-9' : 'h-10 w-10'}>
+                <AvatarFallback className="bg-blue-600 text-white font-medium text-xs sm:text-sm">
                   {getUserInitials(user?.name, user?.email)}
                 </AvatarFallback>
               </Avatar>
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent className="w-56" align="end" forceMount>
+          <DropdownMenuContent 
+            className={`${isMobile ? 'w-48' : 'w-56'}`} 
+            align="end" 
+            forceMount
+            side={isMobile ? 'bottom' : 'bottom'}
+            sideOffset={8}
+          >
             <DropdownMenuLabel className="font-normal">
               <div className="flex flex-col space-y-1">
                 <p className="text-sm font-medium leading-none">
                   {user?.name || 'User'}
                 </p>
-                <p className="text-xs leading-none text-muted-foreground">
+                <p className="text-xs leading-none text-muted-foreground truncate">
                   {user?.email}
                 </p>
               </div>

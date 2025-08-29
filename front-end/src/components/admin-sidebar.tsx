@@ -28,6 +28,7 @@ const navigation = [
   { name: "Analytics", href: "/admin/analytics", icon: BarChart3, resource: "analytics", action: "read" },
   { name: "Subscriptions", href: "/admin/subscriptions", icon: CreditCard, resource: "subscriptions", action: "read" },
   { name: "Payments", href: "/admin/payments", icon: Crown, resource: "subscriptions", action: "read" },
+  { name: "Activity Logs", href: "/admin/activity-logs", icon: Activity, resource: "system", action: "read" },
   { name: "System Health", href: "/admin/system", icon: Activity, resource: "system", action: "read" },
   { name: "Notifications", href: "/admin/notifications", icon: Bell, resource: "system", action: "read" },
   { name: "Admin Users", href: "/admin/admins", icon: UserCheck, resource: "admins", action: "read" },
@@ -38,6 +39,11 @@ export function AdminSidebar() {
   const pathname = usePathname()
   const { admin, logout, hasPermission } = useAdminAuth()
   const [isLoggingOut, setIsLoggingOut] = useState(false)
+
+  // Debug logging
+  console.log('Debug - Admin Sidebar - Current admin:', admin)
+  console.log('Debug - Admin Sidebar - Admin role:', admin?.role)
+  console.log('Debug - Admin Sidebar - Is super admin?', admin?.role === "super_admin")
 
   const handleLogout = async () => {
     setIsLoggingOut(true)
@@ -87,7 +93,14 @@ export function AdminSidebar() {
       {/* Navigation */}
       <nav className="flex-1 px-4 py-6 space-y-1">
         {navigation
-          .filter((item) => hasPermission(item.resource, item.action))
+          .filter((item) => {
+            // Admin Users page should only be visible to super admins
+            if (item.href === "/admin/admins") {
+              return admin?.role === "super_admin" || admin?.email === "admin@yoursite.com"
+            }
+            // All other pages use normal permission checking
+            return hasPermission(item.resource, item.action)
+          })
           .map((item) => {
             const Icon = item.icon
             const isActive = pathname === item.href || (item.href !== "/admin" && pathname.startsWith(item.href))

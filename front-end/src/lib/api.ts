@@ -1,4 +1,4 @@
-const API_BASE_URL = 'https://back-end.xayrix1.workers.dev';
+const API_BASE_URL = "https://back-end.xayrix1.workers.dev";
 
 class ApiError extends Error {
   constructor(public status: number, message: string) {

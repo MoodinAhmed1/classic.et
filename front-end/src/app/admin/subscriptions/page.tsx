@@ -62,8 +62,8 @@ interface SubscriptionPlan {
   id: string
   name: string
   tier: "free" | "pro" | "premium"
-  price_monthly: number
-  price_yearly: number
+  priceMonthly: number
+  priceYearly: number
   features: string[]
   limits: {
     links_per_month: number
@@ -72,7 +72,11 @@ interface SubscriptionPlan {
     analytics_retention_days: number
     team_members: number
   }
-  created_at: string
+  visitorCap?: number | null
+  hasFullAnalytics?: boolean
+  hasAdvancedCharts?: boolean
+  hasPdfDownload?: boolean
+  createdAt: string
 }
 
 interface PaymentTransaction {
@@ -101,6 +105,7 @@ export default function SubscriptionManagement() {
   const [selectedPlan, setSelectedPlan] = useState<SubscriptionPlan | null>(null)
   const [isEditPlanDialogOpen, setIsEditPlanDialogOpen] = useState(false)
   const [isCreatePlanDialogOpen, setIsCreatePlanDialogOpen] = useState(false)
+  const [revenueData, setRevenueData] = useState<{ total: number; monthly: number; yearly: number }>({ total: 0, monthly: 0, yearly: 0 })
 
   useEffect(() => {
     fetchData()
@@ -111,11 +116,27 @@ export default function SubscriptionManagement() {
     try {
       const res = await adminApi.getSubscriptions()
       setSubscriptions(res.subscriptions as any)
-      setPlans([])
+      
+      // Store revenue data from backend
+      if (res.revenue) {
+        setRevenueData(res.revenue)
+      }
+      
+      // Fetch subscription plans
+      try {
+        const plansRes = await adminApi.getSubscriptionPlans()
+        setPlans(plansRes.plans as any)
+      } catch (e) {
+        console.error("Failed to fetch plans:", e)
+        setPlans([])
+      }
+      
+      // Fetch transactions
       try {
         const tx = await adminApi.getTransactions()
         setTransactions(tx.transactions as any)
       } catch (e) {
+        console.error("Failed to fetch transactions:", e)
         setTransactions([])
       }
 
@@ -202,6 +223,74 @@ export default function SubscriptionManagement() {
     setIsEditPlanDialogOpen(true)
   }
 
+  const handleSavePlan = async () => {
+    if (!selectedPlan) return
+    
+    try {
+      const formData = {
+        name: (document.getElementById('edit-plan-name') as HTMLInputElement)?.value || selectedPlan.name,
+        tier: selectedPlan.tier,
+        priceMonthly: parseInt((document.getElementById('edit-monthly-price') as HTMLInputElement)?.value || selectedPlan.priceMonthly.toString()),
+        priceYearly: parseInt((document.getElementById('edit-yearly-price') as HTMLInputElement)?.value || selectedPlan.priceYearly.toString()),
+        features: (document.getElementById('edit-features') as HTMLTextAreaElement)?.value?.split('\n').filter(f => f.trim()) || selectedPlan.features,
+        limits: selectedPlan.limits,
+        visitorCap: selectedPlan.limits.links_per_month === -1 ? null : selectedPlan.limits.links_per_month,
+        hasFullAnalytics: selectedPlan.limits.analytics_retention_days > 30,
+        hasAdvancedCharts: selectedPlan.limits.analytics_retention_days > 30,
+        hasPdfDownload: selectedPlan.limits.analytics_retention_days > 30
+      }
+
+      await adminApi.updateSubscriptionPlan(selectedPlan.id, formData)
+      setIsEditPlanDialogOpen(false)
+      setSelectedPlan(null)
+      fetchData() // Refresh data
+    } catch (error) {
+      console.error('Failed to update plan:', error)
+    }
+  }
+
+  const handleCreatePlan = async () => {
+    try {
+      const formData = {
+        name: (document.getElementById('plan-name') as HTMLInputElement)?.value || '',
+        tier: (document.getElementById('plan-tier') as HTMLSelectElement)?.value || 'pro',
+        priceMonthly: parseInt((document.getElementById('monthly-price') as HTMLInputElement)?.value || '0'),
+        priceYearly: parseInt((document.getElementById('yearly-price') as HTMLInputElement)?.value || '0'),
+        features: (document.getElementById('features') as HTMLTextAreaElement)?.value?.split('\n').filter(f => f.trim()) || [],
+        limits: {
+          links_per_month: 100,
+          api_requests_per_month: 1000,
+          custom_domains: 1,
+          analytics_retention_days: 30,
+          team_members: 1
+        },
+        visitorCap: null,
+        hasFullAnalytics: false,
+        hasAdvancedCharts: false,
+        hasPdfDownload: false
+      }
+
+      await adminApi.createSubscriptionPlan(formData)
+      setIsCreatePlanDialogOpen(false)
+      fetchData() // Refresh data
+    } catch (error) {
+      console.error('Failed to create plan:', error)
+    }
+  }
+
+  const handleDeletePlan = async (planId: string) => {
+    if (!confirm('Are you sure you want to delete this plan? This action cannot be undone.')) {
+      return
+    }
+
+    try {
+      await adminApi.deleteSubscriptionPlan(planId)
+      fetchData() // Refresh data
+    } catch (error) {
+      console.error('Failed to delete plan:', error)
+    }
+  }
+
   const handleCancelSubscription = async (subscriptionId: string) => {
     console.log("Canceling subscription:", subscriptionId)
     // API call to cancel subscription
@@ -212,16 +301,29 @@ export default function SubscriptionManagement() {
     // API call to refund transaction
   }
 
+  const handleDownloadTransactions = async () => {
+    try {
+      const response = await adminApi.downloadTransactions('csv')
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `transactions_${new Date().toISOString().split('T')[0]}.csv`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+    } catch (error) {
+      console.error('Failed to download transactions:', error)
+    }
+  }
+
   // Calculate stats
   const stats = {
     totalSubscriptions: subscriptions.length,
     activeSubscriptions: subscriptions.filter((s) => s.status === "active").length,
-    monthlyRevenue: subscriptions
-      .filter((s) => s.status === "active" && s.billing_cycle === "monthly")
-      .reduce((sum, s) => sum + s.amount, 0),
-    yearlyRevenue: subscriptions
-      .filter((s) => s.status === "active" && s.billing_cycle === "yearly")
-      .reduce((sum, s) => sum + s.amount, 0),
+    monthlyRevenue: revenueData.monthly,
+    yearlyRevenue: revenueData.yearly,
   }
 
   return (
@@ -381,13 +483,25 @@ export default function SubscriptionManagement() {
                             <TableCell>
                               <Badge variant="outline">{subscription.billing_cycle.toUpperCase()}</Badge>
                             </TableCell>
-                            <TableCell>{formatCurrency(subscription.amount, subscription.currency)}</TableCell>
+                            <TableCell>
+                              {subscription.amount > 0 ? (
+                                formatCurrency(subscription.amount, subscription.currency)
+                              ) : (
+                                <span className="text-muted-foreground">Free</span>
+                              )}
+                            </TableCell>
                             <TableCell>
                               <div className="text-sm">
-                                <div>{new Date(subscription.current_period_start).toLocaleDateString()}</div>
-                                <div className="text-muted-foreground">
-                                  to {new Date(subscription.current_period_end).toLocaleDateString()}
-                                </div>
+                                {subscription.current_period_start && subscription.current_period_end ? (
+                                  <>
+                                    <div>{new Date(subscription.current_period_start).toLocaleDateString()}</div>
+                                    <div className="text-muted-foreground">
+                                      to {new Date(subscription.current_period_end).toLocaleDateString()}
+                                    </div>
+                                  </>
+                                ) : (
+                                  <span className="text-muted-foreground">No period set</span>
+                                )}
                               </div>
                             </TableCell>
                             <TableCell className="text-right">
@@ -479,7 +593,7 @@ export default function SubscriptionManagement() {
                           <Textarea id="features" placeholder="Advanced analytics&#10;Custom domains&#10;API access" />
                         </div>
                         <div className="flex gap-2">
-                          <Button className="flex-1">Create Plan</Button>
+                          <Button className="flex-1" onClick={handleCreatePlan}>Create Plan</Button>
                           <Button variant="outline" onClick={() => setIsCreatePlanDialogOpen(false)}>
                             Cancel
                           </Button>
@@ -505,12 +619,12 @@ export default function SubscriptionManagement() {
                       <CardContent className="space-y-4">
                         <div>
                           <div className="text-2xl font-bold">
-                            {plan.price_monthly === 0 ? "Free" : formatCurrency(plan.price_monthly, "ETB")}
+                            {plan.priceMonthly === 0 ? "Free" : formatCurrency(plan.priceMonthly, "ETB")}
                           </div>
                           <p className="text-sm text-muted-foreground">
-                            {plan.price_monthly === 0
+                            {plan.priceMonthly === 0
                               ? "Forever free"
-                              : `${formatCurrency(plan.price_yearly, "ETB")} yearly`}
+                              : `${formatCurrency(plan.priceYearly, "ETB")} yearly`}
                           </p>
                         </div>
                         <div>
@@ -540,14 +654,23 @@ export default function SubscriptionManagement() {
                             <div>Analytics: {plan.limits.analytics_retention_days} days</div>
                           </div>
                         </div>
-                        <Button
-                          variant="outline"
-                          className="w-full bg-transparent"
-                          onClick={() => handleEditPlan(plan)}
-                        >
-                          <Edit className="h-4 w-4 mr-2" />
-                          Edit Plan
-                        </Button>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            className="flex-1 bg-transparent"
+                            onClick={() => handleEditPlan(plan)}
+                          >
+                            <Edit className="h-4 w-4 mr-2" />
+                            Edit Plan
+                          </Button>
+                          <Button
+                            variant="outline"
+                            className="bg-red-50 text-red-600 hover:bg-red-100"
+                            onClick={() => handleDeletePlan(plan.id)}
+                          >
+                            <XCircle className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </CardContent>
                     </Card>
                   ))}
@@ -561,7 +684,7 @@ export default function SubscriptionManagement() {
               <CardHeader>
                 <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
                   <CardTitle>Payment Transactions</CardTitle>
-                  <Button>
+                  <Button onClick={handleDownloadTransactions}>
                     <Download className="h-4 w-4 mr-2" />
                     Export Transactions
                   </Button>
@@ -677,11 +800,11 @@ export default function SubscriptionManagement() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="edit-monthly-price">Monthly Price (ETB)</Label>
-                    <Input id="edit-monthly-price" type="number" defaultValue={selectedPlan.price_monthly} />
+                    <Input id="edit-monthly-price" type="number" defaultValue={selectedPlan.priceMonthly} />
                   </div>
                   <div>
                     <Label htmlFor="edit-yearly-price">Yearly Price (ETB)</Label>
-                    <Input id="edit-yearly-price" type="number" defaultValue={selectedPlan.price_yearly} />
+                    <Input id="edit-yearly-price" type="number" defaultValue={selectedPlan.priceYearly} />
                   </div>
                 </div>
                 <div>
@@ -689,7 +812,7 @@ export default function SubscriptionManagement() {
                   <Textarea id="edit-features" defaultValue={selectedPlan.features.join("\n")} />
                 </div>
                 <div className="flex gap-2">
-                  <Button className="flex-1">Save Changes</Button>
+                  <Button className="flex-1" onClick={handleSavePlan}>Save Changes</Button>
                   <Button variant="outline" onClick={() => setIsEditPlanDialogOpen(false)}>
                     Cancel
                   </Button>

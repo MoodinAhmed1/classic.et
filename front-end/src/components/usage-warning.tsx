@@ -86,24 +86,24 @@ export function UsageWarning({ onClose }: UsageWarningProps) {
 
   return (
     <Card className={`border ${getWarningColor()}`}>
-      <CardContent className="p-4">
+      <CardContent className="p-3 sm:p-4">
         <div className="flex items-start justify-between">
-          <div className="flex items-start gap-3 flex-1">
-            <AlertTriangle className={`h-5 w-5 mt-0.5 ${getWarningIcon()}`} />
-            <div className="flex-1">
-              <h4 className={`font-medium ${isAtLimit ? 'text-red-900 dark:text-red-100' : 'text-orange-900 dark:text-orange-100'}`}>
+          <div className="flex items-start gap-2 sm:gap-3 flex-1">
+            <AlertTriangle className={`h-4 w-4 sm:h-5 sm:w-5 mt-0.5 flex-shrink-0 ${getWarningIcon()}`} />
+            <div className="flex-1 min-w-0">
+              <h4 className={`font-medium text-sm sm:text-base ${isAtLimit ? 'text-red-900 dark:text-red-100' : 'text-orange-900 dark:text-orange-100'}`}>
                 {getWarningTitle()}
               </h4>
-              <p className={`text-sm mt-1 ${isAtLimit ? 'text-red-700 dark:text-red-300' : 'text-orange-700 dark:text-orange-300'}`}>
+              <p className={`text-xs sm:text-sm mt-1 ${isAtLimit ? 'text-red-700 dark:text-red-300' : 'text-orange-700 dark:text-orange-300'}`}>
                 {getWarningMessage()}
               </p>
               
-              <div className="mt-3 space-y-2">
+              <div className="mt-2 sm:mt-3 space-y-2">
                 {usageData.limits.links.percentage >= 80 && (
                   <div>
                     <div className="flex items-center justify-between text-xs mb-1">
                       <span>Links Created</span>
-                      <span>{usageData.limits.links.current} / {usageData.limits.links.limit === -1 ? 'Unlimited' : usageData.limits.links.limit}</span>
+                      <span className="text-right">{usageData.limits.links.current} / {usageData.limits.links.limit === -1 ? 'Unlimited' : usageData.limits.links.limit}</span>
                     </div>
                     <Progress 
                       value={usageData.limits.links.percentage} 
@@ -116,7 +116,7 @@ export function UsageWarning({ onClose }: UsageWarningProps) {
                   <div>
                     <div className="flex items-center justify-between text-xs mb-1">
                       <span>Visitors Tracked</span>
-                      <span>{usageData.limits.visitors.current} / {usageData.limits.visitors.limit === null ? 'Unlimited' : usageData.limits.visitors.limit}</span>
+                      <span className="text-right">{usageData.limits.visitors.current} / {usageData.limits.visitors.limit === null ? 'Unlimited' : usageData.limits.visitors.limit}</span>
                     </div>
                     <Progress 
                       value={usageData.limits.visitors.percentage} 
@@ -126,36 +126,28 @@ export function UsageWarning({ onClose }: UsageWarningProps) {
                 )}
               </div>
               
-              <div className="flex gap-2 mt-4">
+              <div className="mt-3 sm:mt-4 flex flex-col sm:flex-row gap-2 sm:gap-3">
+                <Link href="/dashboard/subscription" className="flex-1">
+                  <Button 
+                    size="sm" 
+                    className={`w-full text-xs sm:text-sm ${isAtLimit ? 'bg-red-600 hover:bg-red-700' : 'bg-orange-600 hover:bg-orange-700'}`}
+                  >
+                    <ArrowUpRight className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                    Upgrade Plan
+                  </Button>
+                </Link>
                 <Button 
-                  size="sm" 
-                  onClick={() => window.location.href = '/dashboard/subscription'}
-                  className={isAtLimit ? 'bg-red-600 hover:bg-red-700' : 'bg-orange-600 hover:bg-orange-700'}
-                >
-                  <ArrowUpRight className="h-4 w-4 mr-1" />
-                  {usageData?.plan?.tier === 'free' ? 'Upgrade Plan' : 'Upgrade to Premium'}
-                </Button>
-                <Button 
-                  size="sm" 
                   variant="outline" 
-                  asChild
+                  size="sm" 
+                  onClick={handleClose}
+                  className="text-xs sm:text-sm"
                 >
-                  <Link href="/dashboard/subscription">
-                    View Details
-                  </Link>
+                  <X className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                  Dismiss
                 </Button>
               </div>
             </div>
           </div>
-          
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleClose}
-            className="h-6 w-6 p-0 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-          >
-            <X className="h-4 w-4" />
-          </Button>
         </div>
       </CardContent>
     </Card>
