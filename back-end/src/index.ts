@@ -1840,10 +1840,6 @@ app.post('/api/admin/auth/login', async (c) => {
 
 app.get('/api/admin/auth/me', adminAuthMiddleware as any, async (c) => {
   const admin = (c as any).get('adminUser');
-  console.log('Debug - Admin user from middleware:', admin);
-  console.log('Debug - Admin role:', admin.role);
-  console.log('Debug - Admin permissions:', admin.permissions);
-  
   const adminResponse = {
     id: admin.id,
     email: admin.email,
@@ -1855,27 +1851,6 @@ app.get('/api/admin/auth/me', adminAuthMiddleware as any, async (c) => {
     createdAt: admin.created_at,
   };
   return c.json({ adminUser: adminResponse });
-});
-
-// Debug endpoint to check admin user in database
-app.get('/api/admin/debug/user', async (c) => {
-  try {
-    const email = c.req.query('email') || 'admin@yoursite.com';
-    const admin = await (c.env.DB as any)
-      .prepare('SELECT * FROM admin_users WHERE email = ?')
-      .bind(email)
-      .first();
-    
-    return c.json({ 
-      debug: true,
-      email: email,
-      admin: admin,
-      found: !!admin 
-    });
-  } catch (e) {
-    console.error('Debug error:', e);
-    return c.json({ error: 'Debug failed', details: e }, 500);
-  }
 });
 
 app.post('/api/admin/auth/logout', async (c) => {
@@ -2326,196 +2301,30 @@ app.get('/api/admin/subscriptions', adminAuthMiddleware as any, async (c) => {
       .bind(...params, limit, offset)
       .all();
 
-    // Get subscription amounts and plan details from payment transactions
-    const subscriptionAmounts = await (c.env.DB as any)
-      .prepare(`
-        SELECT 
-          t.user_id, 
-          t.amount, 
-          t.billing_cycle, 
-          t.status,
-          t.created_at as payment_date,
-          p.name as plan_name,
-          p.price_monthly,
-          p.price_yearly
-        FROM payment_transactions t
-        LEFT JOIN subscription_plans p ON t.plan_id = p.id
-        WHERE t.status = 'success' 
-        AND t.user_id IN (${rows?.results?.map(() => '?').join(',') || ''})
-        ORDER BY t.created_at DESC
-      `)
-      .bind(...(rows?.results?.map((u: any) => u.id) || []))
-      .all();
+    const subscriptions = (rows?.results || []).map((u: any) => ({
+      id: `sub_${u.id}`,
+      user_id: u.id,
+      user_name: u.name,
+      user_email: u.email,
+      plan_id: u.tier,
+      plan_name: u.tier,
+      tier: u.tier,
+      status: u.subscription_status,
+      billing_cycle: 'monthly',
+      amount: 0,
+      currency: 'ETB',
+      current_period_start: u.current_period_start,
+      current_period_end: u.current_period_end,
+      cancel_at_period_end: !!u.cancel_at_period_end,
+      created_at: u.current_period_start,
+      updated_at: u.current_period_end,
+    }));
 
-    // Create a map of user_id to their latest successful payment
-    const userPayments = new Map();
-    (subscriptionAmounts?.results || []).forEach((payment: any) => {
-      if (!userPayments.has(payment.user_id)) {
-        userPayments.set(payment.user_id, payment);
-      }
-    });
-
-    const subscriptions = (rows?.results || []).map((u: any) => {
-      const payment = userPayments.get(u.id);
-      const now = new Date();
-      const paymentDate = payment?.payment_date ? new Date(payment.payment_date) : new Date(u.created_at || now);
-      
-      // Calculate period dates based on billing cycle
-      let periodStart, periodEnd;
-      if (payment?.billing_cycle === 'yearly') {
-        periodStart = new Date(paymentDate);
-        periodEnd = new Date(paymentDate);
-        periodEnd.setFullYear(periodEnd.getFullYear() + 1);
-      } else {
-        periodStart = new Date(paymentDate);
-        periodEnd = new Date(paymentDate);
-        periodEnd.setMonth(periodEnd.getMonth() + 1);
-      }
-
-      return {
-        id: `sub_${u.id}`,
-        user_id: u.id,
-        user_name: u.name || 'Unknown User',
-        user_email: u.email || 'No email',
-        plan_id: u.tier,
-        plan_name: payment?.plan_name || u.tier,
-        tier: u.tier,
-        status: u.subscription_status || 'active',
-        billing_cycle: payment?.billing_cycle || 'monthly',
-        amount: Number(payment?.amount || payment?.price_monthly || 0),
-        currency: 'ETB',
-        current_period_start: u.current_period_start || periodStart.toISOString(),
-        current_period_end: u.current_period_end || periodEnd.toISOString(),
-        cancel_at_period_end: !!u.cancel_at_period_end,
-        created_at: u.created_at || paymentDate.toISOString(),
-        updated_at: u.updated_at || paymentDate.toISOString(),
-      };
-    });
-
-    // Calculate real revenue from successful transactions
-    const revenueData = await (c.env.DB as any)
-      .prepare(`
-        SELECT 
-          SUM(CASE WHEN billing_cycle = 'monthly' THEN amount ELSE 0 END) as monthly_revenue,
-          SUM(CASE WHEN billing_cycle = 'yearly' THEN amount ELSE 0 END) as yearly_revenue,
-          SUM(amount) as total_revenue
-        FROM payment_transactions 
-        WHERE status = 'success'
-      `)
-      .first();
-
-    const revenue = { 
-      total: Number(revenueData?.total_revenue || 0), 
-      monthly: Number(revenueData?.monthly_revenue || 0), 
-      yearly: Number(revenueData?.yearly_revenue || 0) 
-    };
-    
+    // Basic revenue aggregates (0 until payment rows are integrated)
+    const revenue = { total: 0, monthly: 0, yearly: 0 };
     return c.json({ subscriptions, total, revenue });
   } catch (e) {
     console.error('Admin subscriptions error:', e);
-    return c.json({ error: 'Internal server error' }, 500);
-  }
-});
-
-// Admin: activity logs
-app.get('/api/admin/activity-logs', adminAuthMiddleware as any, async (c) => {
-  try {
-    const limit = Math.max(1, Math.min(200, parseInt((c.req.query('limit') as string) || '50')));
-    const offset = Math.max(0, parseInt((c.req.query('offset') as string) || '0'));
-    const action = (c.req.query('action') as string) || '';
-    const adminUserId = (c.req.query('adminUserId') as string) || '';
-
-    let base = 'FROM admin_activity_logs l LEFT JOIN admin_users a ON l.admin_user_id = a.id WHERE 1=1';
-    const params: any[] = [];
-    
-    if (action) {
-      base += ' AND l.action = ?';
-      params.push(action);
-    }
-    
-    if (adminUserId) {
-      base += ' AND l.admin_user_id = ?';
-      params.push(adminUserId);
-    }
-
-    const totalRow = await (c.env.DB as any).prepare(`SELECT COUNT(*) as cnt ${base}`).bind(...params).first();
-    const total = Number((totalRow as any)?.cnt || 0);
-
-    const rows = await (c.env.DB as any)
-      .prepare(`SELECT l.*, a.name as admin_name, a.email as admin_email ${base} ORDER BY l.created_at DESC LIMIT ? OFFSET ?`)
-      .bind(...params, limit, offset)
-      .all();
-
-    const logs = (rows?.results || []).map((r: any) => ({
-      id: r.id,
-      admin_user_id: r.admin_user_id,
-      admin_name: r.admin_name || 'Unknown Admin',
-      admin_email: r.admin_email || 'No email',
-      action: r.action,
-      resource: r.resource,
-      details: r.details,
-      ip_address: r.ip_address,
-      user_agent: r.user_agent,
-      created_at: r.created_at,
-    }));
-
-    return c.json({ logs, total });
-  } catch (e) {
-    console.error('Admin activity logs error:', e);
-    return c.json({ error: 'Internal server error' }, 500);
-  }
-});
-
-// Admin: system settings
-app.get('/api/admin/settings/system', adminAuthMiddleware as any, async (c) => {
-  try {
-    const rows = await (c.env.DB as any)
-      .prepare(`
-        SELECT setting_key, setting_value, setting_type 
-        FROM system_settings 
-        ORDER BY setting_key
-      `)
-      .all();
-
-    const settings: any = {};
-    (rows?.results || []).forEach((row: any) => {
-      let value = row.setting_value;
-      if (row.setting_type === 'boolean') {
-        value = value === 'true';
-      } else if (row.setting_type === 'number') {
-        value = parseInt(value) || 0;
-      }
-      settings[row.setting_key] = value;
-    });
-
-    return c.json({ settings });
-  } catch (e) {
-    console.error('Admin system settings error:', e);
-    return c.json({ error: 'Internal server error' }, 500);
-  }
-});
-
-app.put('/api/admin/settings/system', adminAuthMiddleware as any, async (c) => {
-  try {
-    const body = await c.req.json();
-    const settings = body.settings || body;
-
-    for (const [key, value] of Object.entries(settings)) {
-      const settingType = typeof value === 'boolean' ? 'boolean' : typeof value === 'number' ? 'number' : 'string';
-      const stringValue = String(value);
-
-      await (c.env.DB as any)
-        .prepare(`
-          INSERT OR REPLACE INTO system_settings (setting_key, setting_value, setting_type, updated_at)
-          VALUES (?, ?, ?, datetime('now'))
-        `)
-        .bind(key, stringValue, settingType)
-        .run();
-    }
-
-    return c.json({ success: true });
-  } catch (e) {
-    console.error('Admin update system settings error:', e);
     return c.json({ error: 'Internal server error' }, 500);
   }
 });

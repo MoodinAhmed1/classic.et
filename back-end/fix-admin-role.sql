@@ -37,3 +37,4 @@ INSERT OR IGNORE INTO admin_users (
 
 -- Verify the update
 SELECT id, email, name, role, permissions, is_active FROM admin_users WHERE email = 'admin@yoursite.com';
+

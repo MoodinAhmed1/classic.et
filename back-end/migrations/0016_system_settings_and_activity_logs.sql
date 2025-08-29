@@ -54,3 +54,4 @@ INSERT OR IGNORE INTO system_settings (setting_key, setting_value, setting_type,
 ('chapa_webhook_url', '', 'string', 'Chapa payment webhook URL'),
 ('chapa_secret_key', '', 'string', 'Chapa payment secret key'),
 ('resend_api_key', '', 'string', 'Resend email API key');
+
