@@ -247,35 +247,35 @@ export default function AnalyticsPage() {
 
   if (isLoading) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-3 md:space-y-6">
         <div>
-          <h2 className="text-3xl font-bold text-foreground">Analytics Dashboard</h2>
-          <p className="text-muted-foreground">System-wide analytics and insights</p>
+          <h2 className="text-xl md:text-2xl lg:text-3xl font-bold text-foreground">Analytics Dashboard</h2>
+          <p className="text-xs md:text-sm lg:text-base text-muted-foreground">System-wide analytics and insights</p>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-3">
-          {[...Array(3)].map((_, i) => (
+        <div className="grid gap-2 grid-cols-1 xs:grid-cols-2 lg:grid-cols-4">
+          {[...Array(4)].map((_, i) => (
             <Card key={i}>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <div className="h-4 w-20 bg-muted animate-pulse rounded" />
-                <div className="h-4 w-4 bg-muted animate-pulse rounded" />
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
+                <div className="h-3 w-12 md:w-16 lg:w-20 bg-muted animate-pulse rounded" />
+                <div className="h-3 w-3 bg-muted animate-pulse rounded" />
               </CardHeader>
               <CardContent>
-                <div className="h-8 w-16 bg-muted animate-pulse rounded mb-2" />
-                <div className="h-3 w-24 bg-muted animate-pulse rounded" />
+                <div className="h-5 w-8 md:h-6 md:w-12 lg:h-8 lg:w-16 bg-muted animate-pulse rounded mb-2" />
+                <div className="h-2 w-16 md:w-20 lg:w-24 bg-muted animate-pulse rounded" />
               </CardContent>
             </Card>
           ))}
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-3 grid-cols-1 lg:grid-cols-2">
           {[...Array(4)].map((_, i) => (
             <Card key={i}>
-              <CardHeader>
-                <div className="h-5 w-32 bg-muted animate-pulse rounded" />
+              <CardHeader className="pb-2">
+                <div className="h-4 w-20 md:w-24 lg:w-32 bg-muted animate-pulse rounded" />
               </CardHeader>
-              <CardContent>
-                <div className="h-64 bg-muted animate-pulse rounded" />
+              <CardContent className="px-2 md:px-6">
+                <div className="h-32 md:h-48 lg:h-64 bg-muted animate-pulse rounded" />
               </CardContent>
             </Card>
           ))}
@@ -285,16 +285,18 @@ export default function AnalyticsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3 md:space-y-6 px-1 md:px-0">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-3xl font-bold text-foreground">Analytics Dashboard</h2>
-          <p className="text-muted-foreground">System-wide analytics and insights</p>
-        </div>
-        <div className="flex gap-2">
+      <div>
+        <h2 className="text-xl md:text-2xl lg:text-3xl font-bold text-foreground">Analytics Dashboard</h2>
+        <p className="text-xs md:text-sm lg:text-base text-muted-foreground">System-wide analytics and insights</p>
+      </div>
+
+      {/* Controls */}
+      <div className="space-y-3 md:space-y-0 md:flex md:items-center md:justify-between">
+        <div className="space-y-2 md:space-y-0 md:flex md:gap-3">
           <Select value={timeRange} onValueChange={setTimeRange}>
-            <SelectTrigger className="w-[120px]">
+            <SelectTrigger className="w-full md:w-[140px]">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -304,83 +306,83 @@ export default function AnalyticsPage() {
               <SelectItem value="1y">Last year</SelectItem>
             </SelectContent>
           </Select>
-          <Button variant="outline" onClick={handleExport}>
+          <Button variant="outline" onClick={handleExport} className="w-full md:w-auto">
             <Download className="mr-2 h-4 w-4" />
-            Export
+            Export Data
           </Button>
         </div>
       </div>
 
-      {/* Overview Stats */}
-      <div className="grid gap-4 md:grid-cols-4">
+      {/* Stats Overview */}
+      <div className="grid gap-2 grid-cols-1 xs:grid-cols-2 lg:grid-cols-4">
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Clicks</CardTitle>
-            <MousePointer className="h-4 w-4 text-muted-foreground" />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
+            <CardTitle className="text-xs font-medium truncate">Total Clicks</CardTitle>
+            <MousePointer className="h-3 w-3 text-muted-foreground flex-shrink-0" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{analyticsData?.overview.totalClicks.toLocaleString()}</div>
+            <div className="text-base md:text-lg lg:text-2xl font-bold">{analyticsData?.overview.totalClicks.toLocaleString()}</div>
             <div className={`flex items-center text-xs ${getGrowthColor(analyticsData?.overview.clicksGrowth || 0)}`}>
               {getGrowthIcon(analyticsData?.overview.clicksGrowth || 0)}
-              <span className="ml-1">{Math.abs(analyticsData?.overview.clicksGrowth || 0)}% from last period</span>
+              <span className="ml-1 truncate">{Math.abs(analyticsData?.overview.clicksGrowth || 0)}% from last</span>
             </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Users</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
+            <CardTitle className="text-xs font-medium truncate">Total Users</CardTitle>
+            <Users className="h-3 w-3 text-muted-foreground flex-shrink-0" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{analyticsData?.overview.totalUsers.toLocaleString()}</div>
+            <div className="text-base md:text-lg lg:text-2xl font-bold">{analyticsData?.overview.totalUsers.toLocaleString()}</div>
             <div className={`flex items-center text-xs ${getGrowthColor(analyticsData?.overview.usersGrowth || 0)}`}>
               {getGrowthIcon(analyticsData?.overview.usersGrowth || 0)}
-              <span className="ml-1">{Math.abs(analyticsData?.overview.usersGrowth || 0)}% from last period</span>
+              <span className="ml-1 truncate">{Math.abs(analyticsData?.overview.usersGrowth || 0)}% from last</span>
             </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Links</CardTitle>
-            <LinkIcon className="h-4 w-4 text-muted-foreground" />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
+            <CardTitle className="text-xs font-medium truncate">Total Links</CardTitle>
+            <LinkIcon className="h-3 w-3 text-muted-foreground flex-shrink-0" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{analyticsData?.overview.totalLinks.toLocaleString()}</div>
+            <div className="text-base md:text-lg lg:text-2xl font-bold">{analyticsData?.overview.totalLinks.toLocaleString()}</div>
             <div className={`flex items-center text-xs ${getGrowthColor(analyticsData?.overview.linksGrowth || 0)}`}>
               {getGrowthIcon(analyticsData?.overview.linksGrowth || 0)}
-              <span className="ml-1">{Math.abs(analyticsData?.overview.linksGrowth || 0)}% from last period</span>
+              <span className="ml-1 truncate">{Math.abs(analyticsData?.overview.linksGrowth || 0)}% from last</span>
             </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
+            <CardTitle className="text-xs font-medium truncate">Total Revenue</CardTitle>
+            <DollarSign className="h-3 w-3 text-muted-foreground flex-shrink-0" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(analyticsData?.revenue.total || 0)}</div>
-            <div className="text-xs text-muted-foreground">
+            <div className="text-base md:text-lg lg:text-2xl font-bold">{formatCurrency(analyticsData?.revenue.total || 0)}</div>
+            <div className="text-xs text-muted-foreground truncate">
               {formatCurrency(analyticsData?.revenue.monthly || 0)} this month
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Main Charts */}
-      <div className="grid gap-4 md:grid-cols-2">
-        {/* Clicks Over Time */}
-        <Card className="md:col-span-2">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>Activity Over Time</CardTitle>
-                <CardDescription>Clicks and links created over time</CardDescription>
+      {/* Main Content */}
+      <div className="grid gap-3 grid-cols-1 lg:grid-cols-2">
+        {/* Activity Chart */}
+        <Card className="lg:col-span-2">
+          <CardHeader className="pb-2">
+            <div className="space-y-2 md:space-y-0 md:flex md:items-center md:justify-between">
+              <div className="min-w-0">
+                <CardTitle className="text-base md:text-lg lg:text-xl truncate">Activity Over Time</CardTitle>
+                <CardDescription className="text-xs md:text-sm">Clicks and links created over time</CardDescription>
               </div>
               <Select value={chartType} onValueChange={setChartType}>
-                <SelectTrigger className="w-[100px]">
+                <SelectTrigger className="w-full md:w-[100px]">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -391,21 +393,23 @@ export default function AnalyticsPage() {
               </Select>
             </div>
           </CardHeader>
-          <CardContent>
-            <ChartContainer
-              config={{
-                clicks: {
-                  label: "Clicks",
-                  color: "hsl(var(--chart-1))",
-                },
-                links: {
-                  label: "Links",
-                  color: "hsl(var(--chart-2))",
-                },
-              }}
-              className="h-[300px]"
-            >
-              <ResponsiveContainer width="100%" height="100%">
+          <CardContent className="px-2 md:px-6">
+            <div className="w-full overflow-x-auto">
+              <div className="min-w-[280px]">
+                <ChartContainer
+                  config={{
+                    clicks: {
+                      label: "Clicks",
+                      color: "hsl(var(--chart-1))",
+                    },
+                    links: {
+                      label: "Links",
+                      color: "hsl(var(--chart-2))",
+                    },
+                  }}
+                  className="h-[180px] md:h-[250px] lg:h-[300px]"
+                >
+                    <ResponsiveContainer width="100%" height="100%">
                 {chartType === "line" ? (
                   <LineChart data={analyticsData?.clicksOverTime}>
                     <CartesianGrid strokeDasharray="3 3" />
@@ -449,21 +453,25 @@ export default function AnalyticsPage() {
                     <Bar dataKey="links" fill="var(--color-links)" />
                   </BarChart>
                 )}
-              </ResponsiveContainer>
-            </ChartContainer>
+                    </ResponsiveContainer>
+                </ChartContainer>
+              </div>
+            </div>
           </CardContent>
         </Card>
 
         {/* Device Stats */}
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Smartphone className="h-4 w-4" />
-              Device Types
-            </CardTitle>
-            <CardDescription>Clicks by device type</CardDescription>
+          <CardHeader className="pb-2">
+            <div className="min-w-0">
+              <CardTitle className="flex items-center gap-2 text-base md:text-lg lg:text-xl">
+                <Smartphone className="h-4 w-4 flex-shrink-0" />
+                <span className="truncate">Device Types</span>
+              </CardTitle>
+              <CardDescription className="text-xs md:text-sm">Clicks by device type</CardDescription>
+            </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-2 md:px-6">
             {analyticsData?.deviceStats && analyticsData.deviceStats.length > 0 ? (
               <>
                 <ChartContainer
@@ -473,7 +481,7 @@ export default function AnalyticsPage() {
                       color: "hsl(var(--chart-1))",
                     },
                   }}
-                  className="h-[200px]"
+                  className="h-[140px] md:h-[180px] lg:h-[200px]"
                 >
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
@@ -481,9 +489,9 @@ export default function AnalyticsPage() {
                         data={analyticsData.deviceStats}
                         cx="50%"
                         cy="50%"
-                        innerRadius={40}
-                        outerRadius={80}
-                        paddingAngle={5}
+                        innerRadius={20}
+                        outerRadius={50}
+                        paddingAngle={3}
                         dataKey="count"
                       >
                         {analyticsData.deviceStats.map((entry, index) => (
@@ -495,25 +503,25 @@ export default function AnalyticsPage() {
                     </PieChart>
                   </ResponsiveContainer>
                 </ChartContainer>
-                <div className="mt-4 space-y-2">
+                <div className="mt-3 space-y-2">
                   {analyticsData.deviceStats.map((device, index) => (
                     <div key={device.device} className="flex items-center justify-between text-sm">
-                      <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
-                        <span>{device.device}</span>
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
+                        <span className="truncate text-xs md:text-sm">{device.device}</span>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">{device.count.toLocaleString()}</span>
-                        <Badge variant="secondary">{device.percentage}%</Badge>
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        <span className="font-medium text-xs">{device.count.toLocaleString()}</span>
+                        <Badge variant="secondary" className="text-xs px-1">{device.percentage}%</Badge>
                       </div>
                     </div>
                   ))}
                 </div>
               </>
             ) : (
-              <div className="text-center py-8 text-muted-foreground">
-                <Smartphone className="h-8 w-8 mx-auto mb-2" />
-                <p className="text-sm">No device data available</p>
+              <div className="text-center py-6 text-muted-foreground">
+                <Smartphone className="h-6 w-6 mx-auto mb-2" />
+                <p className="text-xs md:text-sm">No device data available</p>
               </div>
             )}
           </CardContent>
@@ -521,28 +529,30 @@ export default function AnalyticsPage() {
 
         {/* Browser Stats */}
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Monitor className="h-4 w-4" />
-              Browser Usage
-            </CardTitle>
-            <CardDescription>Clicks by browser</CardDescription>
+          <CardHeader className="pb-2">
+            <div className="min-w-0">
+              <CardTitle className="flex items-center gap-2 text-base md:text-lg lg:text-xl">
+                <Monitor className="h-4 w-4 flex-shrink-0" />
+                <span className="truncate">Browser Usage</span>
+              </CardTitle>
+              <CardDescription className="text-xs md:text-sm">Clicks by browser</CardDescription>
+            </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-2 md:px-6">
             {analyticsData?.browserStats && analyticsData.browserStats.length > 0 ? (
               <div className="space-y-3">
                 {analyticsData.browserStats.map((browser, index) => (
                   <div key={browser.browser} className="space-y-1">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium">{browser.browser}</span>
-                      <div className="flex items-center gap-2">
-                        <span>{browser.count.toLocaleString()}</span>
-                        <Badge variant="outline">{browser.percentage}%</Badge>
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium truncate flex-1 min-w-0 pr-2 text-xs md:text-sm">{browser.browser}</span>
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        <span className="text-xs">{browser.count.toLocaleString()}</span>
+                        <Badge variant="outline" className="text-xs px-1">{browser.percentage}%</Badge>
                       </div>
                     </div>
-                    <div className="w-full bg-muted rounded-full h-2">
+                    <div className="w-full bg-muted rounded-full h-1.5">
                       <div
-                        className="h-2 rounded-full"
+                        className="h-1.5 rounded-full"
                         style={{
                           width: `${browser.percentage}%`,
                           backgroundColor: COLORS[index % COLORS.length],
@@ -553,9 +563,9 @@ export default function AnalyticsPage() {
                 ))}
               </div>
             ) : (
-              <div className="text-center py-8 text-muted-foreground">
-                <Monitor className="h-8 w-8 mx-auto mb-2" />
-                <p className="text-sm">No browser data available</p>
+              <div className="text-center py-6 text-muted-foreground">
+                <Monitor className="h-6 w-6 mx-auto mb-2" />
+                <p className="text-xs md:text-sm">No browser data available</p>
               </div>
             )}
           </CardContent>
@@ -563,43 +573,49 @@ export default function AnalyticsPage() {
 
         {/* Revenue Chart */}
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <DollarSign className="h-4 w-4" />
-              Revenue Over Time
-            </CardTitle>
-            <CardDescription>Revenue and subscriptions (ETB)</CardDescription>
+          <CardHeader className="pb-2">
+            <div className="min-w-0">
+              <CardTitle className="flex items-center gap-2 text-base md:text-lg lg:text-xl">
+                <DollarSign className="h-4 w-4 flex-shrink-0" />
+                <span className="truncate">Revenue Over Time</span>
+              </CardTitle>
+              <CardDescription className="text-xs md:text-sm">Revenue and subscriptions (ETB)</CardDescription>
+            </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-2 md:px-6">
             {analyticsData?.revenueOverTime && analyticsData.revenueOverTime.length > 0 ? (
-              <ChartContainer
-                config={{
-                  revenue: {
-                    label: "Revenue",
-                    color: "hsl(var(--chart-1))",
-                  },
-                  subscriptions: {
-                    label: "Subscriptions",
-                    color: "hsl(var(--chart-2))",
-                  },
-                }}
-                className="h-[200px]"
-              >
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={analyticsData.revenueOverTime}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="date" tickFormatter={formatDate} />
-                    <YAxis />
-                    <ChartTooltip content={<ChartTooltipContent />} />
-                    <Area type="monotone" dataKey="revenue" stroke="var(--color-revenue)" fill="var(--color-revenue)" />
-                    <Area type="monotone" dataKey="subscriptions" stroke="var(--color-subscriptions)" fill="var(--color-subscriptions)" />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </ChartContainer>
+              <div className="overflow-x-auto">
+                <div className="min-w-[280px]">
+                  <ChartContainer
+                    config={{
+                      revenue: {
+                        label: "Revenue",
+                        color: "hsl(var(--chart-1))",
+                      },
+                      subscriptions: {
+                        label: "Subscriptions",
+                        color: "hsl(var(--chart-2))",
+                      },
+                    }}
+                    className="h-[140px] md:h-[180px] lg:h-[200px]"
+                  >
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={analyticsData.revenueOverTime}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="date" tickFormatter={formatDate} fontSize={10} />
+                        <YAxis fontSize={10} />
+                        <ChartTooltip content={<ChartTooltipContent />} />
+                        <Area type="monotone" dataKey="revenue" stroke="var(--color-revenue)" fill="var(--color-revenue)" />
+                        <Area type="monotone" dataKey="subscriptions" stroke="var(--color-subscriptions)" fill="var(--color-subscriptions)" />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </ChartContainer>
+                </div>
+              </div>
             ) : (
-              <div className="text-center py-8 text-muted-foreground">
-                <DollarSign className="h-8 w-8 mx-auto mb-2" />
-                <p className="text-sm">No revenue data available</p>
+              <div className="text-center py-6 text-muted-foreground">
+                <DollarSign className="h-6 w-6 mx-auto mb-2" />
+                <p className="text-xs md:text-sm">No revenue data available</p>
               </div>
             )}
           </CardContent>
@@ -607,35 +623,37 @@ export default function AnalyticsPage() {
 
         {/* Top Countries */}
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Globe className="h-4 w-4" />
-              Top Countries
-            </CardTitle>
-            <CardDescription>Clicks by country</CardDescription>
+          <CardHeader className="pb-2">
+            <div className="min-w-0">
+              <CardTitle className="flex items-center gap-2 text-base md:text-lg lg:text-xl">
+                <Globe className="h-4 w-4 flex-shrink-0" />
+                <span className="truncate">Top Countries</span>
+              </CardTitle>
+              <CardDescription className="text-xs md:text-sm">Clicks by country</CardDescription>
+            </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-2 md:px-6">
             {analyticsData?.countryStats && analyticsData.countryStats.length > 0 ? (
               <div className="space-y-3">
                 {analyticsData.countryStats.map((country, index) => (
                   <div key={country.country} className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="w-6 h-4 bg-muted rounded-sm flex items-center justify-center text-xs">
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      <div className="w-5 h-3 bg-muted rounded-sm flex items-center justify-center text-xs flex-shrink-0">
                         {country.country.slice(0, 2).toUpperCase()}
                       </div>
-                      <span className="text-sm font-medium">{country.country}</span>
+                      <span className="text-xs md:text-sm font-medium truncate">{country.country}</span>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm">{country.count.toLocaleString()}</span>
-                      <Badge variant="outline">{country.percentage}%</Badge>
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      <span className="text-xs">{country.count.toLocaleString()}</span>
+                      <Badge variant="outline" className="text-xs px-1">{country.percentage}%</Badge>
                     </div>
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="text-center py-8 text-muted-foreground">
-                <Globe className="h-8 w-8 mx-auto mb-2" />
-                <p className="text-sm">No country data available</p>
+              <div className="text-center py-6 text-muted-foreground">
+                <Globe className="h-6 w-6 mx-auto mb-2" />
+                <p className="text-xs md:text-sm">No country data available</p>
               </div>
             )}
           </CardContent>
@@ -644,50 +662,54 @@ export default function AnalyticsPage() {
 
       {/* Top Links Table */}
       <Card>
-        <CardHeader>
-          <CardTitle>Top Performing Links</CardTitle>
-          <CardDescription>Links with the most clicks</CardDescription>
+        <CardHeader className="pb-2">
+          <div className="min-w-0">
+            <CardTitle className="text-base md:text-lg lg:text-xl truncate">Top Performing Links</CardTitle>
+            <CardDescription className="text-xs md:text-sm">Links with the most clicks</CardDescription>
+          </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-1 md:px-6">
           {analyticsData?.topLinks && analyticsData.topLinks.length > 0 ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Rank</TableHead>
-                  <TableHead>Link</TableHead>
-                  <TableHead>User</TableHead>
-                  <TableHead className="text-right">Clicks</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {analyticsData.topLinks.map((link, index) => (
-                  <TableRow key={link.id}>
-                    <TableCell>
-                      <Badge variant="outline">#{index + 1}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div>
-                        <div className="font-medium">{link.title}</div>
-                        <div className="text-sm text-muted-foreground font-mono">/{link.shortCode}</div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="text-sm">{link.user}</div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        <BarChart3 className="h-3 w-3 text-muted-foreground" />
-                        <span className="font-medium">{link.clicks.toLocaleString()}</span>
-                      </div>
-                    </TableCell>
+            <div className="overflow-x-auto">
+              <Table className="min-w-[300px]">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-12 text-xs">#</TableHead>
+                    <TableHead className="min-w-0 text-xs">Link</TableHead>
+                    <TableHead className="w-20 hidden lg:table-cell text-xs">User</TableHead>
+                    <TableHead className="text-right w-16 text-xs">Clicks</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {analyticsData.topLinks.map((link, index) => (
+                    <TableRow key={link.id}>
+                      <TableCell className="py-2">
+                        <Badge variant="outline" className="text-xs px-1">#{index + 1}</Badge>
+                      </TableCell>
+                      <TableCell className="min-w-0 py-2">
+                        <div className="min-w-0">
+                          <div className="font-medium truncate text-xs md:text-sm max-w-[120px] md:max-w-[200px]">{link.title}</div>
+                          <div className="text-xs text-muted-foreground font-mono truncate max-w-[120px] md:max-w-[200px]">/{link.shortCode}</div>
+                        </div>
+                      </TableCell>
+                      <TableCell className="hidden lg:table-cell py-2">
+                        <div className="text-xs truncate max-w-[80px]">{link.user}</div>
+                      </TableCell>
+                      <TableCell className="text-right py-2">
+                        <div className="flex items-center justify-end gap-1">
+                          <BarChart3 className="h-3 w-3 text-muted-foreground" />
+                          <span className="font-medium text-xs">{link.clicks.toLocaleString()}</span>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           ) : (
-            <div className="text-center py-8 text-muted-foreground">
-              <LinkIcon className="h-8 w-8 mx-auto mb-2" />
-              <p className="text-sm">No link data available</p>
+            <div className="text-center py-6 text-muted-foreground">
+              <LinkIcon className="h-6 w-6 mx-auto mb-2" />
+              <p className="text-xs md:text-sm">No link data available</p>
             </div>
           )}
         </CardContent>

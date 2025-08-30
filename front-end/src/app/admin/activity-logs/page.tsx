@@ -150,92 +150,98 @@ export default function ActivityLogsPage() {
   const uniqueAdmins = Array.from(new Set(logs.map((log) => log.admin_name)))
 
   return (
-    <>
-      <AdminHeader title="Activity Logs" subtitle="Monitor system activity and admin actions" />
+    <div className="space-y-3 md:space-y-6 px-1 md:px-0">
+      {/* Header */}
+      <div>
+        <h2 className="text-xl md:text-2xl lg:text-3xl font-bold text-foreground">Activity Logs</h2>
+        <p className="text-xs md:text-sm lg:text-base text-muted-foreground">Monitor system activity and admin actions</p>
+      </div>
 
-      <main className="flex-1 overflow-y-auto p-6">
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Logs</CardTitle>
-              <Activity className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{totalLogs.toLocaleString()}</div>
-              <p className="text-xs text-muted-foreground">All activity records</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Today's Activity</CardTitle>
-              <Calendar className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {logs.filter((log) => {
-                  const today = new Date().toDateString()
-                  return new Date(log.created_at).toDateString() === today
-                }).length}
-              </div>
-              <p className="text-xs text-muted-foreground">Actions today</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Active Admins</CardTitle>
-              <User className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{uniqueAdmins.length}</div>
-              <p className="text-xs text-muted-foreground">Unique admin users</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Actions Types</CardTitle>
-              <Shield className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{uniqueActions.length}</div>
-              <p className="text-xs text-muted-foreground">Different action types</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Filters and Search */}
-        <Card className="mb-6">
-          <CardHeader>
-            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-              <CardTitle>Activity Logs</CardTitle>
-              <div className="flex gap-2">
-                <Button onClick={fetchLogs}>
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                  Refresh
-                </Button>
-                <Button variant="outline" onClick={handleExport}>
-                  <Download className="h-4 w-4 mr-2" />
-                  Export
-                </Button>
-              </div>
-            </div>
+      {/* Stats Cards */}
+      <div className="grid gap-2 grid-cols-1 xs:grid-cols-2 lg:grid-cols-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 px-2 md:px-6">
+            <CardTitle className="text-xs font-medium truncate">Total Logs</CardTitle>
+            <Activity className="h-3 w-3 text-muted-foreground flex-shrink-0" />
           </CardHeader>
-          <CardContent>
-            <div className="flex flex-col sm:flex-row gap-4 mb-4">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <Input
-                  placeholder="Search logs..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
+          <CardContent className="px-2 md:px-6">
+            <div className="text-base md:text-lg lg:text-2xl font-bold">{totalLogs.toLocaleString()}</div>
+            <p className="text-xs text-muted-foreground truncate">All activity records</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 px-2 md:px-6">
+            <CardTitle className="text-xs font-medium truncate">Today's Activity</CardTitle>
+            <Calendar className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+          </CardHeader>
+          <CardContent className="px-2 md:px-6">
+            <div className="text-base md:text-lg lg:text-2xl font-bold">
+              {logs.filter((log) => {
+                const today = new Date().toDateString()
+                return new Date(log.created_at).toDateString() === today
+              }).length}
+            </div>
+            <p className="text-xs text-muted-foreground truncate">Actions today</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 px-2 md:px-6">
+            <CardTitle className="text-xs font-medium truncate">Active Admins</CardTitle>
+            <User className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+          </CardHeader>
+          <CardContent className="px-2 md:px-6">
+            <div className="text-base md:text-lg lg:text-2xl font-bold">{uniqueAdmins.length}</div>
+            <p className="text-xs text-muted-foreground truncate">Unique admin users</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 px-2 md:px-6">
+            <CardTitle className="text-xs font-medium truncate">Actions Types</CardTitle>
+            <Shield className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+          </CardHeader>
+          <CardContent className="px-2 md:px-6">
+            <div className="text-base md:text-lg lg:text-2xl font-bold">{uniqueActions.length}</div>
+            <p className="text-xs text-muted-foreground truncate">Different action types</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Filters and Search */}
+      <Card className="mb-3 md:mb-6">
+        <CardHeader className="pb-2 px-2 md:px-6">
+          <div className="space-y-2 md:space-y-0 md:flex md:items-center md:justify-between">
+            <CardTitle className="text-base md:text-lg lg:text-xl">Activity Logs</CardTitle>
+            <div className="flex gap-2">
+              <Button onClick={fetchLogs} className="flex-1 md:flex-none">
+                <RefreshCw className="h-4 w-4 mr-2" />
+                <span className="hidden sm:inline">Refresh</span>
+                <span className="sm:hidden">Sync</span>
+              </Button>
+              <Button variant="outline" onClick={handleExport} className="flex-1 md:flex-none">
+                <Download className="h-4 w-4 mr-2" />
+                <span className="hidden sm:inline">Export</span>
+                <span className="sm:hidden">CSV</span>
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="px-1 md:px-6">
+          <div className="space-y-2 md:space-y-0 md:flex md:gap-3 mb-3">
+            <div className="relative flex-1 min-w-0">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Input
+                placeholder="Search logs..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10 w-full"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-1 md:flex md:gap-3">
               <Select value={actionFilter} onValueChange={setActionFilter}>
-                <SelectTrigger className="w-full sm:w-40">
+                <SelectTrigger className="w-full md:w-40 text-xs md:text-sm">
                   <SelectValue placeholder="Filter by action" />
                 </SelectTrigger>
                 <SelectContent>
@@ -248,7 +254,7 @@ export default function ActivityLogsPage() {
                 </SelectContent>
               </Select>
               <Select value={resourceFilter} onValueChange={setResourceFilter}>
-                <SelectTrigger className="w-full sm:w-40">
+                <SelectTrigger className="w-full md:w-40 text-xs md:text-sm">
                   <SelectValue placeholder="Filter by resource" />
                 </SelectTrigger>
                 <SelectContent>
@@ -261,86 +267,143 @@ export default function ActivityLogsPage() {
                 </SelectContent>
               </Select>
             </div>
+          </div>
 
-            <div className="rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Admin</TableHead>
-                    <TableHead>Action</TableHead>
-                    <TableHead>Resource</TableHead>
-                    <TableHead>Details</TableHead>
-                    <TableHead>IP Address</TableHead>
-                    <TableHead>Date</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {loading ? (
-                    <TableRow>
-                      <TableCell colSpan={6} className="text-center py-8">
-                        Loading activity logs...
-                      </TableCell>
-                    </TableRow>
-                  ) : filteredLogs.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={6} className="text-center py-8">
-                        No activity logs found matching your criteria.
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    filteredLogs.map((log) => (
-                      <TableRow key={log.id}>
-                        <TableCell>
-                          <div>
-                            <div className="font-medium">{log.admin_name}</div>
-                            <div className="text-sm text-muted-foreground">{log.admin_email}</div>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge className={getActionColor(log.action)}>
-                            <span className="flex items-center gap-1">
+          {/* Mobile-first activity logs layout */}
+          <div className="block md:hidden">
+            {loading ? (
+              <div className="text-center py-6 text-muted-foreground">
+                <Clock className="h-6 w-6 mx-auto mb-2" />
+                <p className="text-xs">Loading activity logs...</p>
+              </div>
+            ) : filteredLogs.length === 0 ? (
+              <div className="text-center py-6 text-muted-foreground">
+                <Activity className="h-6 w-6 mx-auto mb-2" />
+                <p className="text-xs">No activity logs found matching your criteria.</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {filteredLogs.map((log) => (
+                  <Card key={log.id} className="border">
+                    <CardContent className="p-2">
+                      <div className="space-y-2">
+                        <div className="flex flex-wrap items-center gap-1">
+                          <Badge className={getActionColor(log.action)} variant="outline">
+                            <span className="flex items-center gap-1 text-xs">
                               {getActionIcon(log.action)}
                               {log.action.toUpperCase()}
                             </span>
                           </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline">{log.resource.toUpperCase()}</Badge>
-                        </TableCell>
-                        <TableCell>
-                          <div className="max-w-xs truncate" title={log.details}>
-                            {log.details}
+                          <Badge variant="outline" className="text-xs">{log.resource.toUpperCase()}</Badge>
+                        </div>
+                        <div className="min-w-0">
+                          <div className="font-medium text-sm truncate">{log.admin_name}</div>
+                          <div className="text-xs text-muted-foreground truncate">{log.admin_email}</div>
+                        </div>
+                        <div className="bg-muted/50 p-2 rounded text-xs">
+                          <div className="text-muted-foreground mb-1">Details:</div>
+                          <div className="break-words text-xs">{log.details}</div>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2 text-xs">
+                          <div className="min-w-0">
+                            <span className="text-muted-foreground">IP: </span>
+                            <code className="bg-muted px-1 py-0.5 rounded text-xs break-all">{log.ip_address}</code>
                           </div>
-                        </TableCell>
-                        <TableCell>
-                          <code className="text-xs bg-muted px-2 py-1 rounded">
-                            {log.ip_address}
-                          </code>
-                        </TableCell>
-                        <TableCell>
-                          <div className="text-sm">
-                            <div>{formatDate(log.created_at)}</div>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </div>
+                        </div>
+                        <div className="flex items-center justify-between text-xs border-t pt-2">
+                          <span className="text-muted-foreground">Date:</span>
+                          <span className="font-medium text-xs">{formatDate(log.created_at)}</span>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </div>
 
-            {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="flex items-center justify-between mt-4">
-                <div className="text-sm text-muted-foreground">
+          {/* Desktop table layout */}
+          <div className="hidden md:block rounded-md border overflow-x-auto">
+            <Table className="min-w-[700px]">
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-48">Admin</TableHead>
+                  <TableHead className="w-24">Action</TableHead>
+                  <TableHead className="w-24">Resource</TableHead>
+                  <TableHead className="min-w-0">Details</TableHead>
+                  <TableHead className="w-32">IP Address</TableHead>
+                  <TableHead className="w-40">Date</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {loading ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-8">
+                      Loading activity logs...
+                    </TableCell>
+                  </TableRow>
+                ) : filteredLogs.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-8">
+                      No activity logs found matching your criteria.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredLogs.map((log) => (
+                    <TableRow key={log.id}>
+                      <TableCell className="min-w-0">
+                        <div className="min-w-0">
+                          <div className="font-medium text-sm truncate">{log.admin_name}</div>
+                          <div className="text-xs text-muted-foreground truncate">{log.admin_email}</div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={getActionColor(log.action)} variant="outline">
+                          <span className="flex items-center gap-1 text-xs">
+                            {getActionIcon(log.action)}
+                            {log.action.toUpperCase()}
+                          </span>
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="text-xs">{log.resource.toUpperCase()}</Badge>
+                      </TableCell>
+                      <TableCell className="min-w-0">
+                        <div className="max-w-xs truncate text-sm" title={log.details}>
+                          {log.details}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <code className="text-xs bg-muted px-2 py-1 rounded">
+                          {log.ip_address}
+                        </code>
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-sm">
+                          <div>{formatDate(log.created_at)}</div>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="mt-3 md:mt-4 px-1 md:px-0">
+              <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                <div className="text-xs md:text-sm text-muted-foreground text-center md:text-left">
                   Page {currentPage} of {totalPages}
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-1 md:gap-2">
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
                     disabled={currentPage === 1}
+                    className="flex-1 md:flex-none text-xs md:text-sm"
                   >
                     Previous
                   </Button>
@@ -349,16 +412,17 @@ export default function ActivityLogsPage() {
                     size="sm"
                     onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
                     disabled={currentPage === totalPages}
+                    className="flex-1 md:flex-none text-xs md:text-sm"
                   >
                     Next
                   </Button>
                 </div>
               </div>
-            )}
-          </CardContent>
-        </Card>
-      </main>
-    </>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   )
 }
 

@@ -253,230 +253,157 @@ export default function LinksPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-3xl font-bold text-foreground">Link Management</h2>
-          <p className="text-muted-foreground">Manage all shortened links across users</p>
+          <h2 className="text-2xl sm:text-3xl font-bold text-foreground">Link Management</h2>
+          <p className="text-sm sm:text-base text-muted-foreground">Manage all shortened links across users</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-col sm:flex-row gap-2">
           {selectedLinks.length > 0 && (
-            <Button variant="destructive" onClick={handleBulkDelete}>
+            <Button variant="destructive" onClick={handleBulkDelete} className="w-full sm:w-auto">
               <Trash2 className="mr-2 h-4 w-4" />
               Delete Selected ({selectedLinks.length})
             </Button>
           )}
-          <Button variant="outline" onClick={handleExport}>
+          <Button variant="outline" onClick={handleExport} className="w-full sm:w-auto">
             <Download className="mr-2 h-4 w-4" />
             Export
           </Button>
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-4">
+      {/* Stats Grid */}
+      <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Links</CardTitle>
-            <ExternalLink className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-xs sm:text-sm font-medium">Total Links</CardTitle>
+            <ExternalLink className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{links.length}</div>
+            <div className="text-lg sm:text-2xl font-bold">{links.length}</div>
+            <p className="text-xs text-muted-foreground">All shortened links</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Links</CardTitle>
-            <Eye className="h-4 w-4 text-green-500" />
+            <CardTitle className="text-xs sm:text-sm font-medium">Active Links</CardTitle>
+            <Eye className="h-3 w-3 sm:h-4 sm:w-4 text-green-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{links.filter((l) => l.is_active).length}</div>
+            <div className="text-lg sm:text-2xl font-bold">{links.filter((l) => l.is_active).length}</div>
+            <p className="text-xs text-muted-foreground">Currently active</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Clicks</CardTitle>
-            <BarChart3 className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-xs sm:text-sm font-medium">Total Clicks</CardTitle>
+            <BarChart3 className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {links.reduce((sum, link) => sum + link.click_count, 0).toLocaleString()}
-            </div>
+            <div className="text-lg sm:text-2xl font-bold">{links.reduce((sum, link) => sum + link.click_count, 0)}</div>
+            <p className="text-xs text-muted-foreground">All time clicks</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Inactive Links</CardTitle>
-            <EyeOff className="h-4 w-4 text-red-500" />
+            <CardTitle className="text-xs sm:text-sm font-medium">Unique Users</CardTitle>
+            <Calendar className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{links.filter((l) => !l.is_active).length}</div>
+            <div className="text-lg sm:text-2xl font-bold">{uniqueUsers.length}</div>
+            <p className="text-xs text-muted-foreground">Link creators</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Filters */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Filters</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex gap-4 flex-wrap">
-            <div className="flex-1 min-w-[200px]">
-              <Label htmlFor="search">Search Links</Label>
-              <div className="relative">
-                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  id="search"
-                  placeholder="Search by title, URL, code, or user..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-8"
-                />
+      {/* Filters Section */}
+      <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <CardTitle className="text-lg sm:text-xl">Filters</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="flex flex-col sm:flex-row gap-4">
+                <div className="relative flex-1">
+                  <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search links, titles, or users..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-8"
+                  />
+                </div>
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="w-full sm:w-40">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Status</SelectItem>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="inactive">Inactive</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={userFilter} onValueChange={setUserFilter}>
+                  <SelectTrigger className="w-full sm:w-40">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Users</SelectItem>
+                    {uniqueUsers.map((user) => (
+                      <SelectItem key={user.id} value={user.id}>
+                        {user.name || user.email}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
-            <div>
-              <Label htmlFor="status-filter">Status</Label>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-[120px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="inactive">Inactive</SelectItem>
-                  <SelectItem value="expired">Expired</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label htmlFor="user-filter">User</Label>
-              <Select value={userFilter} onValueChange={setUserFilter}>
-                <SelectTrigger className="w-[150px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Users</SelectItem>
-                  {uniqueUsers.map((user) => (
-                    <SelectItem key={user.id} value={user.id}>
-                      {user.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex items-end">
-              <Button variant="outline" onClick={fetchLinks}>
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Refresh
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </div>
 
-      {/* Links Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Links ({filteredLinks.length})</CardTitle>
-          <CardDescription>Manage shortened links and their analytics</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <div className="space-y-3">
-              {[...Array(5)].map((_, i) => (
-                <div key={i} className="flex items-center space-x-4">
-                  <div className="h-4 w-4 bg-muted animate-pulse rounded" />
-                  <div className="h-4 w-48 bg-muted animate-pulse rounded" />
-                  <div className="h-4 w-32 bg-muted animate-pulse rounded" />
-                  <div className="h-4 w-20 bg-muted animate-pulse rounded" />
-                </div>
-              ))}
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-12">
-                    <Checkbox
-                      checked={selectedLinks.length === filteredLinks.length && filteredLinks.length > 0}
-                      onCheckedChange={handleSelectAll}
-                    />
-                  </TableHead>
-                  <TableHead>Link Details</TableHead>
-                  <TableHead>User</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Clicks</TableHead>
-                  <TableHead>Created</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+      {/* Links List Section */}
+      <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <CardTitle className="text-lg sm:text-xl">Links ({filteredLinks.length})</CardTitle>
+            <CardDescription className="text-sm">Manage and monitor all shortened links</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <RefreshCw className="h-6 w-6 sm:h-8 sm:w-8 mx-auto mb-2 animate-spin" />
+                <p className="text-sm">Loading links...</p>
+              </div>
+            ) : filteredLinks.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <ExternalLink className="h-6 w-6 sm:h-8 sm:w-8 mx-auto mb-2" />
+                <p className="text-sm">No links found.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
                 {filteredLinks.map((link) => (
-                  <TableRow key={link.id}>
-                    <TableCell>
-                      <Checkbox
-                        checked={selectedLinks.includes(link.id)}
-                        onCheckedChange={(checked) => handleSelectLink(link.id, checked as boolean)}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <div className="space-y-1">
-                        <div className="font-medium">{link.title || "Untitled Link"}</div>
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <span className="font-mono bg-muted px-2 py-1 rounded text-xs">{getShortUrl(link)}</span>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-6 w-6 p-0"
-                            onClick={() => copyToClipboard(getShortUrl(link))}
-                          >
-                            <Copy className="h-3 w-3" />
-                          </Button>
-                        </div>
-                        <div className="text-xs text-muted-foreground truncate max-w-[300px]">{link.original_url}</div>
+                  <div key={link.id} className="flex items-center justify-between p-3 border rounded-lg">
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-medium flex-shrink-0">
+                        {link.title?.charAt(0).toUpperCase() || "L"}
                       </div>
-                    </TableCell>
-                    <TableCell>
+                      <div className="min-w-0 flex-1">
+                        <div className="font-medium truncate">{link.title || "Untitled Link"}</div>
+                        <div className="text-sm text-muted-foreground truncate">{getShortUrl(link)}</div>
+                      </div>
+                    </div>
+                    <div className="text-right ml-2">
                       <div className="flex items-center gap-2">
-                        <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-medium">
-                          {link.user_name.charAt(0).toUpperCase()}
-                        </div>
-                        <div>
-                          <div className="text-sm font-medium">{link.user_name}</div>
-                          <div className="text-xs text-muted-foreground">{link.user_email}</div>
-                        </div>
+                        <Badge variant={link.is_active ? "default" : "secondary"}>
+                          {link.is_active ? "Active" : "Inactive"}
+                        </Badge>
+                        <div className="text-sm font-medium">{link.click_count} clicks</div>
                       </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        {link.is_active ? (
-                          <Badge className="bg-green-500">Active</Badge>
-                        ) : (
-                          <Badge variant="secondary">Inactive</Badge>
-                        )}
-                        {link.expires_at && new Date(link.expires_at) < new Date() && (
-                          <Badge variant="destructive">Expired</Badge>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1">
-                        <BarChart3 className="h-3 w-3 text-muted-foreground" />
-                        <span className="font-medium">{link.click_count.toLocaleString()}</span>
-                      </div>
-                      {link.last_clicked && (
-                        <div className="text-xs text-muted-foreground">Last: {formatDate(link.last_clicked)}</div>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                        <Calendar className="h-3 w-3" />
-                        {formatDate(link.created_at)}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right">
+                      <div className="text-xs text-muted-foreground mt-1">{link.user_name}</div>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="ghost" className="h-8 w-8 p-0">
@@ -487,30 +414,11 @@ export default function LinksPage() {
                           <DropdownMenuLabel>Actions</DropdownMenuLabel>
                           <DropdownMenuItem onClick={() => copyToClipboard(getShortUrl(link))}>
                             <Copy className="mr-2 h-4 w-4" />
-                            Copy Short URL
+                            Copy Link
                           </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => {
-                              setSelectedLink(link)
-                              setIsAnalyticsDialogOpen(true)
-                            }}
-                          >
-                            <BarChart3 className="mr-2 h-4 w-4" />
-                            View Analytics
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem onClick={() => handleToggleStatus(link.id)}>
-                            {link.is_active ? (
-                              <>
-                                <EyeOff className="mr-2 h-4 w-4" />
-                                Deactivate
-                              </>
-                            ) : (
-                              <>
-                                <Eye className="mr-2 h-4 w-4" />
-                                Activate
-                              </>
-                            )}
+                          <DropdownMenuItem onClick={() => window.open(getShortUrl(link), "_blank")}>
+                            <ExternalLink className="mr-2 h-4 w-4" />
+                            Open Link
                           </DropdownMenuItem>
                           <DropdownMenuItem
                             onClick={() => {
@@ -534,26 +442,14 @@ export default function LinksPage() {
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
+                    </div>
+                  </div>
                 ))}
-              </TableBody>
-            </Table>
-          )}
-
-          {!isLoading && filteredLinks.length === 0 && (
-            <div className="text-center py-8">
-              <ExternalLink className="mx-auto h-12 w-12 text-muted-foreground" />
-              <h3 className="mt-2 text-sm font-semibold text-foreground">No links found</h3>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {searchTerm || statusFilter !== "all" || userFilter !== "all"
-                  ? "Try adjusting your search or filter criteria."
-                  : "No links have been created yet."}
-              </p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Edit Link Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>

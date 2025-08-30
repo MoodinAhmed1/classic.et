@@ -158,54 +158,65 @@ export default function SettingsPage() {
   }
 
   return (
-    <>
-      <AdminHeader title="Settings" subtitle="Configure system settings and preferences" />
+    <div className="space-y-4 sm:space-y-6">
+      {/* Header */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="text-2xl sm:text-3xl font-bold text-foreground">Settings</h2>
+          <p className="text-sm sm:text-base text-muted-foreground">Configure system settings and preferences</p>
+        </div>
+        <Button onClick={handleSave} disabled={saving} className="w-full sm:w-auto">
+          <Save className="h-4 w-4 mr-2" />
+          {saving ? "Saving..." : "Save Changes"}
+        </Button>
+      </div>
 
-      <main className="flex-1 overflow-y-auto p-6">
-        <div className="flex flex-col lg:flex-row gap-6">
-          {/* Sidebar */}
-          <div className="lg:w-64">
-            <Card>
-              <CardHeader>
-                <CardTitle>Settings</CardTitle>
-              </CardHeader>
-              <CardContent className="p-0">
-                <nav className="space-y-1">
-                  {tabs.map((tab) => {
-                    const Icon = tab.icon
-                    return (
-                      <button
-                        key={tab.id}
-                        onClick={() => setActiveTab(tab.id)}
-                        className={`w-full flex items-center px-4 py-2 text-sm font-medium rounded-md transition-colors ${
-                          activeTab === tab.id
-                            ? "bg-purple-100 text-purple-900 dark:bg-purple-900 dark:text-purple-100"
-                            : "text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
-                        }`}
-                      >
-                        <Icon className="h-4 w-4 mr-3" />
-                        {tab.name}
-                      </button>
-                    )
-                  })}
-                </nav>
-              </CardContent>
-            </Card>
-          </div>
+      {/* Settings Grid */}
+      <div className="grid gap-4 grid-cols-1 lg:grid-cols-4">
+        {/* Sidebar */}
+        <div className="lg:col-span-1">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg sm:text-xl">Settings</CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <nav className="space-y-1">
+                {tabs.map((tab) => {
+                  const Icon = tab.icon
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={() => setActiveTab(tab.id)}
+                      className={`w-full flex items-center px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                        activeTab === tab.id
+                          ? "bg-purple-100 text-purple-900 dark:bg-purple-900 dark:text-purple-100"
+                          : "text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
+                      }`}
+                    >
+                      <Icon className="h-4 w-4 mr-3" />
+                      {tab.name}
+                    </button>
+                  )
+                })}
+              </nav>
+            </CardContent>
+          </Card>
+        </div>
 
-          {/* Main Content */}
-          <div className="flex-1 space-y-6">
+        {/* Main Content */}
+        <div className="lg:col-span-3">
+          <div className="space-y-4 sm:space-y-6">
             {/* General Settings */}
             {activeTab === "general" && (
               <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center">
+                  <CardTitle className="text-lg sm:text-xl flex items-center">
                     <Settings className="h-5 w-5 mr-2" />
                     General Settings
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <CardContent className="space-y-4 sm:space-y-6">
+                  <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
                     <div className="space-y-2">
                       <Label htmlFor="site_name">Site Name</Label>
                       <Input
@@ -237,7 +248,7 @@ export default function SettingsPage() {
                     />
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
                     <div className="space-y-2">
                       <Label htmlFor="contact_email">Contact Email</Label>
                       <Input
@@ -258,66 +269,6 @@ export default function SettingsPage() {
                         placeholder="support@example.com"
                       />
                     </div>
-                  </div>
-
-                  <Separator />
-
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div className="space-y-2">
-                      <Label htmlFor="max_links_per_user">Max Links per User</Label>
-                      <Input
-                        id="max_links_per_user"
-                        type="number"
-                        value={settings.max_links_per_user}
-                        onChange={(e) => setSettings({ ...settings, max_links_per_user: parseInt(e.target.value) || 0 })}
-                        min="1"
-                        max="10000"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="max_clicks_per_link">Max Clicks per Link</Label>
-                      <Input
-                        id="max_clicks_per_link"
-                        type="number"
-                        value={settings.max_clicks_per_link}
-                        onChange={(e) => setSettings({ ...settings, max_clicks_per_link: parseInt(e.target.value) || 0 })}
-                        min="1"
-                        max="1000000"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="link_expiry_days">Link Expiry (Days)</Label>
-                      <Input
-                        id="link_expiry_days"
-                        type="number"
-                        value={settings.link_expiry_days}
-                        onChange={(e) => setSettings({ ...settings, link_expiry_days: parseInt(e.target.value) || 0 })}
-                        min="1"
-                        max="3650"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label>Enable User Registration</Label>
-                      <p className="text-sm text-muted-foreground">Allow new users to register accounts</p>
-                    </div>
-                    <Switch
-                      checked={settings.enable_registration}
-                      onCheckedChange={(checked) => setSettings({ ...settings, enable_registration: checked })}
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label>Require Email Verification</Label>
-                      <p className="text-sm text-muted-foreground">Users must verify their email before accessing features</p>
-                    </div>
-                    <Switch
-                      checked={settings.require_email_verification}
-                      onCheckedChange={(checked) => setSettings({ ...settings, require_email_verification: checked })}
-                    />
                   </div>
                 </CardContent>
               </Card>
@@ -604,8 +555,8 @@ export default function SettingsPage() {
             </div>
           </div>
         </div>
-      </main>
-    </>
+      </div>
+    </div>
   )
 }
 

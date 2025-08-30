@@ -131,44 +131,93 @@ export default function PaymentsPage() {
   const formatCurrency = (amount: number, currency: string) => `${amount.toLocaleString()} ${currency}`
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-4 sm:space-y-6">
+      {/* Header */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-3xl font-bold text-foreground">Payments</h2>
-          <p className="text-muted-foreground">View and manage payment transactions</p>
+          <h2 className="text-2xl sm:text-3xl font-bold text-foreground">Payments</h2>
+          <p className="text-sm sm:text-base text-muted-foreground">View and manage payment transactions</p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={exportCsv}>
+        <div className="flex flex-col sm:flex-row gap-2">
+          <Button variant="outline" onClick={exportCsv} className="w-full sm:w-auto">
             <Download className="h-4 w-4 mr-2" />
             Export CSV
           </Button>
-          <Button variant="outline" onClick={load}>
+          <Button variant="outline" onClick={load} className="w-full sm:w-auto">
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>
         </div>
       </div>
 
-      <Tabs defaultValue="list" className="space-y-6">
+      {/* Stats Grid */}
+      <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-xs sm:text-sm font-medium">Total Transactions</CardTitle>
+            <Download className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-lg sm:text-2xl font-bold">{transactions.length}</div>
+            <p className="text-xs text-muted-foreground">All transactions</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-xs sm:text-sm font-medium">Successful</CardTitle>
+            <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 text-green-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-lg sm:text-2xl font-bold">{transactions.filter(t => t.status === 'success').length}</div>
+            <p className="text-xs text-muted-foreground">Completed payments</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-xs sm:text-sm font-medium">Pending</CardTitle>
+            <Clock className="h-3 w-3 sm:h-4 sm:w-4 text-yellow-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-lg sm:text-2xl font-bold">{transactions.filter(t => t.status === 'pending').length}</div>
+            <p className="text-xs text-muted-foreground">Awaiting confirmation</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-xs sm:text-sm font-medium">Failed</CardTitle>
+            <XCircle className="h-3 w-3 sm:h-4 sm:w-4 text-red-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-lg sm:text-2xl font-bold">{transactions.filter(t => t.status === 'failed').length}</div>
+            <p className="text-xs text-muted-foreground">Failed transactions</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Tabs defaultValue="list" className="space-y-4 sm:space-y-6">
         <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="list">Transactions</TabsTrigger>
-          <TabsTrigger value="verify">Verify Payment</TabsTrigger>
+          <TabsTrigger value="list" className="text-xs sm:text-sm">Transactions</TabsTrigger>
+          <TabsTrigger value="verify" className="text-xs sm:text-sm">Verify Payment</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="list" className="space-y-6">
-          <Card>
+        <TabsContent value="list" className="space-y-4 sm:space-y-6">
+          <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
+            <Card className="lg:col-span-2">
             <CardHeader>
-              <CardTitle>Filters</CardTitle>
+                <CardTitle className="text-lg sm:text-xl">Filters</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="flex gap-4 flex-wrap">
-                <div className="relative min-w-[240px] flex-1">
+                <div className="space-y-4">
+                  <div className="flex flex-col sm:flex-row gap-4">
+                    <div className="relative flex-1">
                   <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                   <Input className="pl-8" placeholder="Search by user, email, tx ref, plan..." value={search} onChange={(e)=>setSearch(e.target.value)} />
                 </div>
                 <div>
                   <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
+                        <SelectTrigger className="w-full sm:w-[160px]">
+                          <SelectValue />
+                        </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Status</SelectItem>
                       <SelectItem value="success">Success</SelectItem>
@@ -177,72 +226,75 @@ export default function PaymentsPage() {
                       <SelectItem value="cancelled">Cancelled</SelectItem>
                     </SelectContent>
                   </Select>
+                    </div>
                 </div>
               </div>
             </CardContent>
           </Card>
+          </div>
 
-          <Card>
+          <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
+            <Card className="lg:col-span-2">
             <CardHeader>
-              <CardTitle>Transactions ({filtered.length})</CardTitle>
+                <CardTitle className="text-lg sm:text-xl">Transactions ({filtered.length})</CardTitle>
             </CardHeader>
             <CardContent>
               {loading ? (
-                <div className="py-10 text-center text-muted-foreground">Loading transactions...</div>
+                  <div className="text-center py-8 text-muted-foreground">
+                    <RefreshCw className="h-6 w-6 sm:h-8 sm:w-8 mx-auto mb-2 animate-spin" />
+                    <p className="text-sm">Loading transactions...</p>
+                  </div>
               ) : filtered.length === 0 ? (
-                <div className="py-10 text-center text-muted-foreground">No transactions found.</div>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Tx Ref</TableHead>
-                      <TableHead>Ref ID</TableHead>
-                      <TableHead>User</TableHead>
-                      <TableHead>Plan</TableHead>
-                      <TableHead>Amount</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Date</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filtered.map((t) => (
-                      <TableRow key={t.id}>
-                        <TableCell className="font-mono text-sm">{t.tx_ref}</TableCell>
-                        <TableCell className="font-mono text-sm">{t.ref_id || '-'}</TableCell>
-                        <TableCell>
-                          <div>
-                            <div className="font-medium">{t.user_name}</div>
-                            <div className="text-sm text-muted-foreground">{t.user_email}</div>
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Search className="h-6 w-6 sm:h-8 sm:w-8 mx-auto mb-2" />
+                    <p className="text-sm">No transactions found.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {filtered.map((transaction) => (
+                      <div key={transaction.id} className="flex items-center justify-between p-3 border rounded-lg">
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-medium flex-shrink-0">
+                            {transaction.user_name.charAt(0).toUpperCase()}
                           </div>
-                        </TableCell>
-                        <TableCell>{t.plan_name}</TableCell>
-                        <TableCell>{formatCurrency(t.amount, t.currency)}</TableCell>
-                        <TableCell>{statusBadge(t.status)}</TableCell>
-                        <TableCell>{new Date(t.created_at).toLocaleString()}</TableCell>
-                        <TableCell className="text-right">
+                          <div className="min-w-0 flex-1">
+                            <div className="font-medium truncate">{transaction.user_name}</div>
+                            <div className="text-sm text-muted-foreground truncate">{transaction.user_email}</div>
+                          </div>
+                        </div>
+                        <div className="text-right ml-2">
+                          <div className="flex items-center gap-2">
+                            {statusBadge(transaction.status)}
+                            <div className="text-sm font-medium">{formatCurrency(transaction.amount, transaction.currency)}</div>
+                          </div>
+                          <div className="text-xs text-muted-foreground mt-1">{transaction.tx_ref}</div>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" className="h-8 w-8 p-0"><MoreHorizontal className="h-4 w-4" /></Button>
+                              <Button variant="ghost" className="h-8 w-8 p-0">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
                               <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                              <DropdownMenuItem onClick={()=>verify(t.tx_ref || '')} disabled={!t.tx_ref}>
-                                Verify with Chapa {t.tx_ref ? '' : '(no tx_ref)'}
+                              <DropdownMenuItem>View Details</DropdownMenuItem>
+                              {transaction.status === "success" && (
+                                <DropdownMenuItem
+                                  onClick={() => refund(transaction.id)}
+                                  className="text-destructive"
+                                >
+                                  Issue Refund
                               </DropdownMenuItem>
-                              {t.status === 'success' && (
-                                <DropdownMenuItem onClick={()=>refund(t.id)} className="text-red-600">Mark as refunded</DropdownMenuItem>
                               )}
                             </DropdownMenuContent>
                           </DropdownMenu>
-                        </TableCell>
-                      </TableRow>
+                        </div>
+                      </div>
                     ))}
-                  </TableBody>
-                </Table>
+                  </div>
               )}
             </CardContent>
           </Card>
+          </div>
         </TabsContent>
 
         <TabsContent value="verify">

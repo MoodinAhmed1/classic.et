@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react"
 import { adminApi } from "@/lib/admin-api"
-import { AdminHeader } from "@/components/admin-header"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -327,229 +326,177 @@ export default function SubscriptionManagement() {
   }
 
   return (
-    <>
-      <AdminHeader title="Subscription Management" subtitle="Manage subscription plans, billing, and payments" />
+    <div className="space-y-3 md:space-y-6 px-1 md:px-0">
+      {/* Header */}
+      <div className="min-w-0">
+        <h2 className="text-xl md:text-2xl lg:text-3xl font-bold text-foreground">Subscription Management</h2>
+        <p className="text-xs md:text-sm lg:text-base text-muted-foreground">Manage subscription plans, billing, and payments</p>
+      </div>
 
-      <main className="flex-1 overflow-y-auto p-6">
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Subscriptions</CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.totalSubscriptions}</div>
-              <p className="text-xs text-muted-foreground">All subscription plans</p>
-            </CardContent>
-          </Card>
+      {/* Stats Grid */}
+      <div className="grid gap-2 grid-cols-1 xs:grid-cols-2 lg:grid-cols-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
+            <CardTitle className="text-xs font-medium truncate">Total Subscriptions</CardTitle>
+            <Users className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-base md:text-lg lg:text-2xl font-bold">{stats.totalSubscriptions}</div>
+            <p className="text-xs text-muted-foreground truncate">All subscription plans</p>
+          </CardContent>
+        </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Active Subscriptions</CardTitle>
-              <CheckCircle className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.activeSubscriptions}</div>
-              <p className="text-xs text-muted-foreground">
-                {((stats.activeSubscriptions / stats.totalSubscriptions) * 100).toFixed(1)}% of total
-              </p>
-            </CardContent>
-          </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
+            <CardTitle className="text-xs font-medium truncate">Active Subscriptions</CardTitle>
+            <CheckCircle className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-base md:text-lg lg:text-2xl font-bold">{stats.activeSubscriptions}</div>
+            <p className="text-xs text-muted-foreground truncate">
+              {stats.totalSubscriptions > 0 ? ((stats.activeSubscriptions / stats.totalSubscriptions) * 100).toFixed(1) : 0}% of total
+            </p>
+          </CardContent>
+        </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Monthly Revenue</CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{formatCurrency(stats.monthlyRevenue, "ETB")}</div>
-              <p className="text-xs text-muted-foreground">Recurring monthly</p>
-            </CardContent>
-          </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
+            <CardTitle className="text-xs font-medium truncate">Monthly Revenue</CardTitle>
+            <DollarSign className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-base md:text-lg lg:text-2xl font-bold">{formatCurrency(stats.monthlyRevenue, "ETB")}</div>
+            <p className="text-xs text-muted-foreground truncate">Recurring monthly</p>
+          </CardContent>
+        </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Yearly Revenue</CardTitle>
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{formatCurrency(stats.yearlyRevenue, "ETB")}</div>
-              <p className="text-xs text-muted-foreground">Annual subscriptions</p>
-            </CardContent>
-          </Card>
-        </div>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
+            <CardTitle className="text-xs font-medium truncate">Yearly Revenue</CardTitle>
+            <TrendingUp className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-base md:text-lg lg:text-2xl font-bold">{formatCurrency(stats.yearlyRevenue, "ETB")}</div>
+            <p className="text-xs text-muted-foreground truncate">Annual subscriptions</p>
+          </CardContent>
+        </Card>
+      </div>
 
-        {/* Main Content Tabs */}
-        <Tabs defaultValue="subscriptions" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="subscriptions">Subscriptions</TabsTrigger>
-            <TabsTrigger value="plans">Plans</TabsTrigger>
-            <TabsTrigger value="transactions">Transactions</TabsTrigger>
-          </TabsList>
+      {/* Main Content Tabs */}
+      <Tabs defaultValue="subscriptions" className="space-y-3 md:space-y-6">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="subscriptions" className="text-xs md:text-sm px-2 py-1">Subscriptions</TabsTrigger>
+          <TabsTrigger value="plans" className="text-xs md:text-sm px-2 py-1">Plans</TabsTrigger>
+          <TabsTrigger value="transactions" className="text-xs md:text-sm px-2 py-1">Transactions</TabsTrigger>
+        </TabsList>
 
-          <TabsContent value="subscriptions" className="space-y-6">
+        <TabsContent value="subscriptions" className="space-y-3 md:space-y-6">
+          <div className="grid gap-3 grid-cols-1">
             <Card>
-              <CardHeader>
-                <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-                  <CardTitle>Active Subscriptions</CardTitle>
-                  <Button onClick={fetchData}>
+              <CardHeader className="pb-2">
+                <div className="space-y-2 md:space-y-0 md:flex md:items-center md:justify-between">
+                  <CardTitle className="text-base md:text-lg lg:text-xl">Active Subscriptions</CardTitle>
+                  <Button onClick={fetchData} className="w-full md:w-auto">
                     <RefreshCw className="h-4 w-4 mr-2" />
                     Refresh
                   </Button>
                 </div>
               </CardHeader>
-              <CardContent>
-                <div className="flex flex-col sm:flex-row gap-4 mb-4">
-                  <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                    <Input
-                      placeholder="Search subscriptions..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10"
-                    />
+              <CardContent className="px-2 md:px-6">
+                <div className="space-y-3">
+                  <div className="space-y-2 md:space-y-0 md:flex md:gap-3">
+                    <div className="relative flex-1">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                      <Input
+                        placeholder="Search subscriptions..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="pl-10"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 md:flex md:gap-3">
+                      <Select value={statusFilter} onValueChange={setStatusFilter}>
+                        <SelectTrigger className="w-full md:w-40">
+                          <SelectValue placeholder="Filter by status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Status</SelectItem>
+                          <SelectItem value="active">Active</SelectItem>
+                          <SelectItem value="canceled">Canceled</SelectItem>
+                          <SelectItem value="past_due">Past Due</SelectItem>
+                          <SelectItem value="unpaid">Unpaid</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Select value={tierFilter} onValueChange={setTierFilter}>
+                        <SelectTrigger className="w-full md:w-40">
+                          <SelectValue placeholder="Filter by tier" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Tiers</SelectItem>
+                          <SelectItem value="free">Free</SelectItem>
+                          <SelectItem value="pro">Pro</SelectItem>
+                          <SelectItem value="premium">Premium</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
-                  <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger className="w-full sm:w-40">
-                      <SelectValue placeholder="Filter by status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Status</SelectItem>
-                      <SelectItem value="active">Active</SelectItem>
-                      <SelectItem value="canceled">Canceled</SelectItem>
-                      <SelectItem value="past_due">Past Due</SelectItem>
-                      <SelectItem value="unpaid">Unpaid</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Select value={tierFilter} onValueChange={setTierFilter}>
-                    <SelectTrigger className="w-full sm:w-40">
-                      <SelectValue placeholder="Filter by tier" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Tiers</SelectItem>
-                      <SelectItem value="free">Free</SelectItem>
-                      <SelectItem value="pro">Pro</SelectItem>
-                      <SelectItem value="premium">Premium</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="rounded-md border">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>User</TableHead>
-                        <TableHead>Plan</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Billing</TableHead>
-                        <TableHead>Amount</TableHead>
-                        <TableHead>Period</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {loading ? (
-                        <TableRow>
-                          <TableCell colSpan={7} className="text-center py-8">
-                            Loading subscriptions...
-                          </TableCell>
-                        </TableRow>
-                      ) : filteredSubscriptions.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={7} className="text-center py-8">
-                            No subscriptions found matching your criteria.
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        filteredSubscriptions.map((subscription) => (
-                          <TableRow key={subscription.id}>
-                            <TableCell>
-                              <div>
-                                <div className="font-medium">{subscription.user_name}</div>
-                                <div className="text-sm text-muted-foreground">{subscription.user_email}</div>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <Badge className={getTierColor(subscription.tier)}>
-                                {subscription.plan_name.toUpperCase()}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>
-                              <Badge className={getStatusColor(subscription.status)}>
-                                {subscription.status.replace("_", " ").toUpperCase()}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant="outline">{subscription.billing_cycle.toUpperCase()}</Badge>
-                            </TableCell>
-                            <TableCell>
-                              {subscription.amount > 0 ? (
-                                formatCurrency(subscription.amount, subscription.currency)
-                              ) : (
-                                <span className="text-muted-foreground">Free</span>
-                              )}
-                            </TableCell>
-                            <TableCell>
-                              <div className="text-sm">
-                                {subscription.current_period_start && subscription.current_period_end ? (
-                                  <>
-                                    <div>{new Date(subscription.current_period_start).toLocaleDateString()}</div>
-                                    <div className="text-muted-foreground">
-                                      to {new Date(subscription.current_period_end).toLocaleDateString()}
-                                    </div>
-                                  </>
-                                ) : (
-                                  <span className="text-muted-foreground">No period set</span>
-                                )}
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" className="h-8 w-8 p-0">
-                                    <MoreHorizontal className="h-4 w-4" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                  <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                  <DropdownMenuItem>
-                                    <Edit className="h-4 w-4 mr-2" />
-                                    Edit Subscription
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem>
-                                    <Calendar className="h-4 w-4 mr-2" />
-                                    Change Billing Date
-                                  </DropdownMenuItem>
-                                  <DropdownMenuSeparator />
-                                  <DropdownMenuItem
-                                    onClick={() => handleCancelSubscription(subscription.id)}
-                                    className="text-red-600"
-                                  >
-                                    <XCircle className="h-4 w-4 mr-2" />
-                                    Cancel Subscription
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            </TableCell>
-                          </TableRow>
-                        ))
-                      )}
-                    </TableBody>
-                  </Table>
+                  <div className="space-y-2">
+                    {filteredSubscriptions.map((subscription) => (
+                      <div key={subscription.id} className="flex items-center justify-between p-2 md:p-3 border rounded-lg">
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                          <div className="flex h-6 w-6 md:h-8 md:w-8 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs md:text-sm font-medium flex-shrink-0">
+                            {subscription.user_name.charAt(0).toUpperCase()}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="font-medium truncate text-sm md:text-base">{subscription.user_name}</div>
+                            <div className="text-xs md:text-sm text-muted-foreground truncate">{subscription.user_email}</div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1 md:gap-2 flex-shrink-0">
+                          <div className="hidden md:flex flex-col items-end gap-1">
+                            <Badge className={getStatusColor(subscription.status)}>{subscription.status}</Badge>
+                            <Badge className={getTierColor(subscription.tier)}>{subscription.tier}</Badge>
+                          </div>
+                          <div className="flex md:hidden flex-col gap-1">
+                            <Badge className={`${getStatusColor(subscription.status)} text-xs px-1`}>{subscription.status}</Badge>
+                          </div>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" className="h-8 w-8 p-0">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                              <DropdownMenuItem>
+                                <Edit className="mr-2 h-4 w-4" />
+                                Edit Subscription
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem className="text-destructive" onClick={() => handleCancelSubscription(subscription.id)}>
+                                <XCircle className="mr-2 h-4 w-4" />
+                                Cancel Subscription
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </CardContent>
             </Card>
-          </TabsContent>
+          </div>
+        </TabsContent>
 
-          <TabsContent value="plans" className="space-y-6">
+        <TabsContent value="plans" className="space-y-3 md:space-y-6">
             <Card>
-              <CardHeader>
-                <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-                  <CardTitle>Subscription Plans</CardTitle>
+              <CardHeader className="pb-2">
+                <div className="space-y-2 md:space-y-0 md:flex md:items-center md:justify-between">
+                  <CardTitle className="text-base md:text-lg lg:text-xl">Subscription Plans</CardTitle>
                   <Dialog open={isCreatePlanDialogOpen} onOpenChange={setIsCreatePlanDialogOpen}>
                     <DialogTrigger asChild>
-                      <Button>
+                      <Button className="w-full md:w-auto">
                         <Plus className="h-4 w-4 mr-2" />
                         Create Plan
                       </Button>
@@ -603,8 +550,8 @@ export default function SubscriptionManagement() {
                   </Dialog>
                 </div>
               </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <CardContent className="px-2 md:px-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-6">
                   {plans.map((plan) => (
                     <Card key={plan.id} className="relative">
                       <CardHeader>
@@ -679,29 +626,106 @@ export default function SubscriptionManagement() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="transactions" className="space-y-6">
+        <TabsContent value="transactions" className="space-y-3 md:space-y-6">
             <Card>
-              <CardHeader>
-                <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-                  <CardTitle>Payment Transactions</CardTitle>
-                  <Button onClick={handleDownloadTransactions}>
+              <CardHeader className="pb-2">
+                <div className="space-y-2 md:space-y-0 md:flex md:items-center md:justify-between">
+                  <CardTitle className="text-base md:text-lg lg:text-xl">Payment Transactions</CardTitle>
+                  <Button onClick={handleDownloadTransactions} className="w-full md:w-auto">
                     <Download className="h-4 w-4 mr-2" />
-                    Export Transactions
+                    <span className="hidden sm:inline">Export Transactions</span>
+                    <span className="sm:hidden">Export</span>
                   </Button>
                 </div>
               </CardHeader>
-              <CardContent>
-                <div className="rounded-md border">
-                  <Table>
+              <CardContent className="px-1 md:px-6">
+                {/* Mobile-first transactions layout */}
+                <div className="block md:hidden">
+                  {loading ? (
+                    <div className="text-center py-6 text-muted-foreground">
+                      <Clock className="h-6 w-6 mx-auto mb-2" />
+                      <p className="text-xs">Loading transactions...</p>
+                    </div>
+                  ) : transactions.length === 0 ? (
+                    <div className="text-center py-6 text-muted-foreground">
+                      <DollarSign className="h-6 w-6 mx-auto mb-2" />
+                      <p className="text-xs">No transactions found.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {transactions.map((transaction) => (
+                        <Card key={transaction.id} className="border">
+                          <CardContent className="p-3">
+                            <div className="space-y-2">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <Badge className={getTransactionStatusColor(transaction.status)} variant="outline">
+                                    <span className="flex items-center gap-1 text-xs">
+                                      {getTransactionStatusIcon(transaction.status)}
+                                      {transaction.status.toUpperCase()}
+                                    </span>
+                                  </Badge>
+                                </div>
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" className="h-6 w-6 p-0">
+                                      <MoreHorizontal className="h-3 w-3" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                    <DropdownMenuItem>View Details</DropdownMenuItem>
+                                    {transaction.status === "success" && (
+                                      <DropdownMenuItem
+                                        onClick={() => handleRefundTransaction(transaction.id)}
+                                        className="text-red-600"
+                                      >
+                                        Issue Refund
+                                      </DropdownMenuItem>
+                                    )}
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </div>
+                              <div>
+                                <div className="font-medium text-sm truncate">{transaction.user_name}</div>
+                                <div className="text-xs text-muted-foreground truncate">{transaction.user_email}</div>
+                              </div>
+                              <div className="flex items-center justify-between text-xs">
+                                <span className="text-muted-foreground">Plan:</span>
+                                <span className="font-medium truncate max-w-[120px]">{transaction.plan_name}</span>
+                              </div>
+                              <div className="flex items-center justify-between text-xs">
+                                <span className="text-muted-foreground">Amount:</span>
+                                <span className="font-bold">{formatCurrency(transaction.amount, transaction.currency)}</span>
+                              </div>
+                              <div className="flex items-center justify-between text-xs">
+                                <span className="text-muted-foreground">Date:</span>
+                                <span>{new Date(transaction.created_at).toLocaleDateString()}</span>
+                              </div>
+                              <div className="flex items-center justify-between text-xs">
+                                <span className="text-muted-foreground">Tx ID:</span>
+                                <span className="font-mono text-xs truncate max-w-[120px]">{transaction.tx_ref}</span>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Desktop table layout */}
+                <div className="hidden md:block overflow-x-auto">
+                  <Table className="min-w-[700px]">
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Transaction ID</TableHead>
-                        <TableHead>User</TableHead>
-                        <TableHead>Plan</TableHead>
-                        <TableHead>Amount</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Date</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
+                        <TableHead className="w-32">Transaction ID</TableHead>
+                        <TableHead className="min-w-0">User</TableHead>
+                        <TableHead className="w-24">Plan</TableHead>
+                        <TableHead className="w-24">Amount</TableHead>
+                        <TableHead className="w-20">Status</TableHead>
+                        <TableHead className="w-20">Date</TableHead>
+                        <TableHead className="text-right w-16">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -720,24 +744,24 @@ export default function SubscriptionManagement() {
                       ) : (
                         transactions.map((transaction) => (
                           <TableRow key={transaction.id}>
-                            <TableCell className="font-mono text-sm">{transaction.tx_ref}</TableCell>
-                            <TableCell>
-                              <div>
-                                <div className="font-medium">{transaction.user_name}</div>
-                                <div className="text-sm text-muted-foreground">{transaction.user_email}</div>
+                            <TableCell className="font-mono text-xs">{transaction.tx_ref}</TableCell>
+                            <TableCell className="min-w-0">
+                              <div className="min-w-0">
+                                <div className="font-medium text-sm truncate">{transaction.user_name}</div>
+                                <div className="text-xs text-muted-foreground truncate">{transaction.user_email}</div>
                               </div>
                             </TableCell>
-                            <TableCell>{transaction.plan_name}</TableCell>
-                            <TableCell>{formatCurrency(transaction.amount, transaction.currency)}</TableCell>
+                            <TableCell className="text-sm truncate">{transaction.plan_name}</TableCell>
+                            <TableCell className="text-sm">{formatCurrency(transaction.amount, transaction.currency)}</TableCell>
                             <TableCell>
-                              <Badge className={getTransactionStatusColor(transaction.status)}>
-                                <span className="flex items-center gap-1">
+                              <Badge className={getTransactionStatusColor(transaction.status)} variant="outline">
+                                <span className="flex items-center gap-1 text-xs">
                                   {getTransactionStatusIcon(transaction.status)}
                                   {transaction.status.toUpperCase()}
                                 </span>
                               </Badge>
                             </TableCell>
-                            <TableCell>{new Date(transaction.created_at).toLocaleDateString()}</TableCell>
+                            <TableCell className="text-sm">{new Date(transaction.created_at).toLocaleDateString()}</TableCell>
                             <TableCell className="text-right">
                               <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
@@ -769,59 +793,6 @@ export default function SubscriptionManagement() {
             </Card>
           </TabsContent>
         </Tabs>
-
-        {/* Edit Plan Dialog */}
-        <Dialog open={isEditPlanDialogOpen} onOpenChange={setIsEditPlanDialogOpen}>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>Edit Subscription Plan</DialogTitle>
-            </DialogHeader>
-            {selectedPlan && (
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="edit-plan-name">Plan Name</Label>
-                    <Input id="edit-plan-name" defaultValue={selectedPlan.name} />
-                  </div>
-                  <div>
-                    <Label htmlFor="edit-plan-tier">Tier</Label>
-                    <Select defaultValue={selectedPlan.tier}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="free">Free</SelectItem>
-                        <SelectItem value="pro">Pro</SelectItem>
-                        <SelectItem value="premium">Premium</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="edit-monthly-price">Monthly Price (ETB)</Label>
-                    <Input id="edit-monthly-price" type="number" defaultValue={selectedPlan.priceMonthly} />
-                  </div>
-                  <div>
-                    <Label htmlFor="edit-yearly-price">Yearly Price (ETB)</Label>
-                    <Input id="edit-yearly-price" type="number" defaultValue={selectedPlan.priceYearly} />
-                  </div>
-                </div>
-                <div>
-                  <Label htmlFor="edit-features">Features (one per line)</Label>
-                  <Textarea id="edit-features" defaultValue={selectedPlan.features.join("\n")} />
-                </div>
-                <div className="flex gap-2">
-                  <Button className="flex-1" onClick={handleSavePlan}>Save Changes</Button>
-                  <Button variant="outline" onClick={() => setIsEditPlanDialogOpen(false)}>
-                    Cancel
-                  </Button>
-                </div>
-              </div>
-            )}
-          </DialogContent>
-        </Dialog>
-      </main>
-    </>
+    </div>
   )
 }

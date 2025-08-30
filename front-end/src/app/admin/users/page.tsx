@@ -210,21 +210,21 @@ export default function UsersPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-3xl font-bold text-foreground">User Management</h2>
-          <p className="text-muted-foreground">Manage user accounts and subscriptions</p>
+          <h2 className="text-2xl sm:text-3xl font-bold text-foreground">User Management</h2>
+          <p className="text-sm sm:text-base text-muted-foreground">Manage user accounts and subscriptions</p>
         </div>
         <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
           <DialogTrigger asChild>
-            <Button>
+            <Button className="w-full sm:w-auto">
               <Plus className="mr-2 h-4 w-4" />
               Add User
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="sm:max-w-md">
             <DialogHeader>
               <DialogTitle>Create New User</DialogTitle>
               <DialogDescription>Add a new user to the system</DialogDescription>
@@ -273,64 +273,68 @@ export default function UsersPage() {
                 </Select>
               </div>
             </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
+            <DialogFooter className="flex flex-col-reverse gap-2 sm:flex-row">
+              <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)} className="w-full sm:w-auto">
                 Cancel
               </Button>
-              <Button onClick={handleCreateUser}>Create User</Button>
+              <Button onClick={handleCreateUser} className="w-full sm:w-auto">Create User</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-4">
+      {/* Stats Grid */}
+      <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Users</CardTitle>
-            <Search className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-xs sm:text-sm font-medium">Total Users</CardTitle>
+            <Search className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{users.length}</div>
+            <div className="text-lg sm:text-2xl font-bold">{users.length}</div>
+            <p className="text-xs text-muted-foreground">All registered users</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Free Users</CardTitle>
-            <Search className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-xs sm:text-sm font-medium">Free Users</CardTitle>
+            <Search className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{users.filter((u) => u.tier === "free").length}</div>
+            <div className="text-lg sm:text-2xl font-bold">{users.filter((u) => u.tier === "free").length}</div>
+            <p className="text-xs text-muted-foreground">Free tier users</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pro Users</CardTitle>
-            <Search className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-xs sm:text-sm font-medium">Pro Users</CardTitle>
+            <Search className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{users.filter((u) => u.tier === "pro").length}</div>
+            <div className="text-lg sm:text-2xl font-bold">{users.filter((u) => u.tier === "pro").length}</div>
+            <p className="text-xs text-muted-foreground">Pro tier users</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Premium Users</CardTitle>
-            <Search className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-xs sm:text-sm font-medium">Premium Users</CardTitle>
+            <Search className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{users.filter((u) => u.tier === "premium").length}</div>
+            <div className="text-lg sm:text-2xl font-bold">{users.filter((u) => u.tier === "premium").length}</div>
+            <p className="text-xs text-muted-foreground">Premium tier users</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Filters */}
+      {/* Filters Section */}
       <Card>
         <CardHeader>
-          <CardTitle>Filters</CardTitle>
+          <CardTitle className="text-lg sm:text-xl">Filters</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex gap-4 flex-wrap">
-            <div className="flex-1 min-w-[200px]">
+          <div className="space-y-4">
+            <div>
               <Label htmlFor="search">Search Users</Label>
               <div className="relative">
                 <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -343,115 +347,86 @@ export default function UsersPage() {
                 />
               </div>
             </div>
-            <div>
-              <Label htmlFor="tier-filter">Tier</Label>
-              <Select value={tierFilter} onValueChange={setTierFilter}>
-                <SelectTrigger className="w-[120px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Tiers</SelectItem>
-                  <SelectItem value="free">Free</SelectItem>
-                  <SelectItem value="pro">Pro</SelectItem>
-                  <SelectItem value="premium">Premium</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label htmlFor="status-filter">Status</Label>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-[120px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="past_due">Past Due</SelectItem>
-                  <SelectItem value="canceled">Canceled</SelectItem>
-                  <SelectItem value="unpaid">Unpaid</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex items-end">
-              <Button variant="outline" onClick={fetchUsers}>
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Refresh
-              </Button>
+            <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
+              <div>
+                <Label htmlFor="tier-filter">Tier</Label>
+                <Select value={tierFilter} onValueChange={setTierFilter}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Tiers</SelectItem>
+                    <SelectItem value="free">Free</SelectItem>
+                    <SelectItem value="pro">Pro</SelectItem>
+                    <SelectItem value="premium">Premium</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="status-filter">Status</Label>
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Status</SelectItem>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="past_due">Past Due</SelectItem>
+                    <SelectItem value="canceled">Canceled</SelectItem>
+                    <SelectItem value="unpaid">Unpaid</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-end">
+                <Button variant="outline" onClick={fetchUsers} className="w-full">
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Refresh
+                </Button>
+              </div>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Users Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Users ({filteredUsers.length})</CardTitle>
-          <CardDescription>Manage user accounts and their subscription details</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <div className="space-y-3">
-              {[...Array(5)].map((_, i) => (
-                <div key={i} className="flex items-center space-x-4">
-                  <div className="h-4 w-4 bg-muted animate-pulse rounded" />
-                  <div className="h-4 w-48 bg-muted animate-pulse rounded" />
-                  <div className="h-4 w-32 bg-muted animate-pulse rounded" />
-                  <div className="h-4 w-20 bg-muted animate-pulse rounded" />
-                </div>
-              ))}
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>User</TableHead>
-                  <TableHead>Tier</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Links</TableHead>
-                  <TableHead>Created</TableHead>
-                  <TableHead>Last Login</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+      {/* Users List Section */}
+      <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <CardTitle className="text-lg sm:text-xl">Users ({filteredUsers.length})</CardTitle>
+            <CardDescription className="text-sm">Manage user accounts and their subscription details</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <div className="space-y-3">
+                {[...Array(5)].map((_, i) => (
+                  <div key={i} className="flex items-center space-x-4">
+                    <div className="h-4 w-4 bg-muted animate-pulse rounded" />
+                    <div className="h-4 w-32 sm:w-48 bg-muted animate-pulse rounded" />
+                    <div className="h-4 w-24 sm:w-32 bg-muted animate-pulse rounded" />
+                    <div className="h-4 w-16 sm:w-20 bg-muted animate-pulse rounded" />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="space-y-3">
                 {filteredUsers.map((user) => (
-                  <TableRow key={user.id}>
-                    <TableCell>
+                  <div key={user.id} className="flex items-center justify-between">
+                    <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-3">
-                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-medium">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-medium flex-shrink-0">
                           {user.name.charAt(0).toUpperCase()}
                         </div>
-                        <div>
-                          <div className="font-medium">{user.name}</div>
-                          <div className="text-sm text-muted-foreground flex items-center gap-1">
-                            <Mail className="h-3 w-3" />
-                            {user.email}
-                            {!user.email_verified && (
-                              <Badge variant="outline" className="text-xs">
-                                Unverified
-                              </Badge>
-                            )}
-                          </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium truncate">{user.name}</p>
+                          <p className="text-xs text-muted-foreground truncate">{user.email}</p>
                         </div>
                       </div>
-                    </TableCell>
-                    <TableCell>{getTierBadge(user.tier)}</TableCell>
-                    <TableCell>{getStatusBadge(user.subscription_status)}</TableCell>
-                    <TableCell>{user.links_count || 0}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                        <Calendar className="h-3 w-3" />
-                        {formatDate(user.created_at)}
+                    </div>
+                    <div className="text-right ml-2">
+                      <div className="flex items-center gap-2">
+                        {getTierBadge(user.tier)}
+                        {getStatusBadge(user.subscription_status)}
                       </div>
-                    </TableCell>
-                    <TableCell>
-                      {user.last_login ? (
-                        <div className="text-sm text-muted-foreground">{formatDate(user.last_login)}</div>
-                      ) : (
-                        <div className="text-sm text-muted-foreground">Never</div>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="ghost" className="h-8 w-8 p-0">
@@ -482,30 +457,30 @@ export default function UsersPage() {
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
+                    </div>
+                  </div>
                 ))}
-              </TableBody>
-            </Table>
-          )}
+              </div>
+            )}
 
-          {!isLoading && filteredUsers.length === 0 && (
-            <div className="text-center py-8">
-              <Search className="mx-auto h-12 w-12 text-muted-foreground" />
-              <h3 className="mt-2 text-sm font-semibold text-foreground">No users found</h3>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {searchTerm || tierFilter !== "all" || statusFilter !== "all"
-                  ? "Try adjusting your search or filter criteria."
-                  : "Get started by creating a new user."}
-              </p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+            {!isLoading && filteredUsers.length === 0 && (
+              <div className="text-center py-4 text-muted-foreground">
+                <Search className="h-6 w-6 sm:h-8 sm:w-8 mx-auto mb-2" />
+                <p className="text-sm">No users found</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {searchTerm || tierFilter !== "all" || statusFilter !== "all"
+                    ? "Try adjusting your search or filter criteria."
+                    : "Get started by creating a new user."}
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Edit User Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Edit User</DialogTitle>
             <DialogDescription>Update user information and subscription details</DialogDescription>
@@ -564,18 +539,18 @@ export default function UsersPage() {
               </div>
             </div>
           )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+          <DialogFooter className="flex flex-col-reverse gap-2 sm:flex-row">
+            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)} className="w-full sm:w-auto">
               Cancel
             </Button>
-            <Button onClick={handleUpdateUser}>Save Changes</Button>
+            <Button onClick={handleUpdateUser} className="w-full sm:w-auto">Save Changes</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* Delete User Dialog */}
       <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Delete User</DialogTitle>
             <DialogDescription>
@@ -590,11 +565,11 @@ export default function UsersPage() {
               </AlertDescription>
             </Alert>
           )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>
+          <DialogFooter className="flex flex-col-reverse gap-2 sm:flex-row">
+            <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)} className="w-full sm:w-auto">
               Cancel
             </Button>
-            <Button variant="destructive" onClick={handleDeleteUser}>
+            <Button variant="destructive" onClick={handleDeleteUser} className="w-full sm:w-auto">
               Delete User
             </Button>
           </DialogFooter>
