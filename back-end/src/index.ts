@@ -6,7 +6,7 @@ import { cors } from 'hono/cors';
 import { jwt, sign, verify } from 'hono/jwt';
 import { setCookie, getCookie } from 'hono/cookie';
 import { UAParser } from 'ua-parser-js';
-import { adminAuthMiddleware, requirePermission, getAdminByEmail, updateAdminLastLogin, verifyAdminPassword, hashAdminPasswordPBKDF2, generateId, logAdminActivity } from './admin-auth';
+import { adminAuthMiddleware, requirePermission, getAdminByEmail, updateAdminLastLogin, verifyAdminPassword, hashAdminPasswordPBKDF2, generateId, logAdminActivity, logUserActivity } from './admin-auth';
 import { 
   checkUsageLimit, 
   incrementUsage, 
@@ -1320,13 +1320,29 @@ app.post('/api/auth/register', async (c) => {
         return c.json({ error: 'Failed to send verification email' }, 500);
       }
 
-      // Store verification code in database
-      const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes from now
+          // Store verification code in database
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes from now
 
-      await c.env.DB.prepare(`
-        INSERT INTO email_verifications (user_id, code, expires_at, created_at)
-        VALUES (?, ?, ?, ?)
-      `).bind(userId, verificationCode, expiresAt.toISOString(), new Date().toISOString()).run();
+    await c.env.DB.prepare(`
+      INSERT INTO email_verifications (user_id, code, expires_at, created_at)
+      VALUES (?, ?, ?, ?)
+    `).bind(userId, verificationCode, expiresAt.toISOString(), new Date().toISOString()).run();
+
+    // Log user activity
+    try {
+      await logUserActivity(
+        c.env.DB,
+        userId,
+        'user_registered',
+        'auth',
+        userId,
+        { email, name, tier: 'free' },
+        c.req.header('CF-Connecting-IP'),
+        c.req.header('User-Agent')
+      );
+    } catch (logError) {
+      console.error('Activity logging error:', logError);
+    }
 
     } catch (emailError) {
       console.error('Failed to send verification email:', emailError);
@@ -1386,6 +1402,22 @@ app.post('/api/auth/verify-email', async (c) => {
     await c.env.DB.prepare(`
       DELETE FROM email_verifications WHERE user_id = ?
     `).bind(verificationRecord.user_id).run();
+
+    // Log user activity
+    try {
+      await logUserActivity(
+        c.env.DB,
+        verificationRecord.user_id,
+        'email_verified',
+        'auth',
+        verificationRecord.user_id,
+        { email: verificationRecord.email, tier: verificationRecord.tier },
+        c.req.header('CF-Connecting-IP'),
+        c.req.header('User-Agent')
+      );
+    } catch (logError) {
+      console.error('Activity logging error:', logError);
+    }
 
     // Generate JWT and set as HttpOnly cookie
     const token = await sign(
@@ -1562,6 +1594,22 @@ app.post("/api/auth/login", async (c) => {
       path: "/",
       maxAge: 60 * 60 * 24 * 7, // 7 days
     })
+
+    // Log user activity
+    try {
+      await logUserActivity(
+        c.env.DB,
+        user.id,
+        'user_login',
+        'auth',
+        user.id,
+        { email: user.email, tier: user.tier },
+        c.req.header('CF-Connecting-IP'),
+        c.req.header('User-Agent')
+      );
+    } catch (logError) {
+      console.error('Activity logging error:', logError);
+    }
 
     return c.json({
       user: {
@@ -1758,6 +1806,22 @@ app.post('/api/auth/reset-password', async (c) => {
       DELETE FROM password_resets WHERE user_id = ?
     `).bind(resetRecord.user_id).run();
 
+    // Log user activity
+    try {
+      await logUserActivity(
+        c.env.DB,
+        resetRecord.user_id,
+        'password_reset',
+        'auth',
+        resetRecord.user_id,
+        { email: resetRecord.email, action: 'password_reset' },
+        c.req.header('CF-Connecting-IP'),
+        c.req.header('User-Agent')
+      );
+    } catch (logError) {
+      console.error('Activity logging error:', logError);
+    }
+
     return c.json({ 
       success: true, 
       message: 'Password has been reset successfully' 
@@ -1772,16 +1836,57 @@ app.post('/api/auth/reset-password', async (c) => {
 
 // New logout route
 app.post('/api/auth/logout', async (c) => {
-  // Clear the auth cookie
-  setCookie(c, 'auth_token', '', {
-    httpOnly: true,
-    secure: true,
-    sameSite: 'None',
-    path: '/',
-    maxAge: 0, // Expire immediately
-  });
+  try {
+    // Get user from JWT token if available
+    const authToken = getCookie(c, 'auth_token');
+    if (authToken) {
+      try {
+        const payload = await verify(authToken, c.env.JWT_SECRET as string);
+        if (payload && payload.userId) {
+          // Log user activity
+          try {
+            await logUserActivity(
+              c.env.DB,
+              payload.userId,
+              'user_logout',
+              'auth',
+              payload.userId,
+              { action: 'logout' },
+              c.req.header('CF-Connecting-IP'),
+              c.req.header('User-Agent')
+            );
+          } catch (logError) {
+            console.error('Activity logging error:', logError);
+          }
+        }
+      } catch (verifyError) {
+        // Token is invalid, continue with logout
+        console.error('Token verification error during logout:', verifyError);
+      }
+    }
 
-  return c.json({ success: true });
+    // Clear the auth cookie
+    setCookie(c, 'auth_token', '', {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'None',
+      path: '/',
+      maxAge: 0, // Expire immediately
+    });
+
+    return c.json({ success: true });
+  } catch (error) {
+    console.error('Logout error:', error);
+    // Still clear the cookie even if logging fails
+    setCookie(c, 'auth_token', '', {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'None',
+      path: '/',
+      maxAge: 0,
+    });
+    return c.json({ success: true });
+  }
 });
 
 // ===== Admin Auth Routes =====
@@ -3047,6 +3152,22 @@ app.put('/api/auth/update-profile', authMiddleware, async (c) => {
       'SELECT id, email, name, tier, created_at FROM users WHERE id = ?'
     ).bind(payload.userId).first() as User;
 
+    // Log user activity
+    try {
+      await logUserActivity(
+        c.env.DB,
+        payload.userId,
+        'profile_updated',
+        'user',
+        payload.userId,
+        { name, email, bio },
+        c.req.header('CF-Connecting-IP'),
+        c.req.header('User-Agent')
+      );
+    } catch (logError) {
+      console.error('Activity logging error:', logError);
+    }
+
     return c.json({ 
       message: 'Profile updated successfully',
       user: updatedUser 
@@ -3102,6 +3223,22 @@ app.put('/api/auth/update-password', authMiddleware, async (c) => {
 
     if (!result.success) {
       return c.json({ error: 'Failed to update password' }, 500);
+    }
+
+    // Log user activity
+    try {
+      await logUserActivity(
+        c.env.DB,
+        payload.userId,
+        'password_updated',
+        'user',
+        payload.userId,
+        { action: 'password_changed' },
+        c.req.header('CF-Connecting-IP'),
+        c.req.header('User-Agent')
+      );
+    } catch (logError) {
+      console.error('Activity logging error:', logError);
     }
 
     return c.json({ message: 'Password updated successfully' });
@@ -3214,6 +3351,22 @@ app.post('/api/links', authMiddleware, async (c) => {
 
     // Increment usage tracking
     await incrementUsage(c.env.DB, payload.userId, 'create_link');
+
+    // Log user activity
+    try {
+      await logUserActivity(
+        c.env.DB,
+        payload.userId,
+        'link_created',
+        'link',
+        linkId,
+        { shortCode, originalUrl, title: pageTitle },
+        c.req.header('CF-Connecting-IP'),
+        c.req.header('User-Agent')
+      );
+    } catch (logError) {
+      console.error('Activity logging error:', logError);
+    }
 
     return c.json({
       id: linkId,
@@ -3344,6 +3497,22 @@ app.put('/api/links/:id', authMiddleware, async (c) => {
       return c.json({ error: 'Link not found' }, 404);
     }
 
+    // Log user activity
+    try {
+      await logUserActivity(
+        c.env.DB,
+        payload.userId,
+        'link_updated',
+        'link',
+        linkId,
+        { title, isActive, expiresAt, shortCode },
+        c.req.header('CF-Connecting-IP'),
+        c.req.header('User-Agent')
+      );
+    } catch (logError) {
+      console.error('Activity logging error:', logError);
+    }
+
     return c.json({ success: true });
 
   } catch (error) {
@@ -3363,6 +3532,22 @@ app.delete('/api/links/:id', authMiddleware, async (c) => {
 
     if (!result.success || (result.meta && result.meta.changes === 0)) {
       return c.json({ error: 'Link not found' }, 404);
+    }
+
+    // Log user activity
+    try {
+      await logUserActivity(
+        c.env.DB,
+        payload.userId,
+        'link_deleted',
+        'link',
+        linkId,
+        { action: 'deleted' },
+        c.req.header('CF-Connecting-IP'),
+        c.req.header('User-Agent')
+      );
+    } catch (logError) {
+      console.error('Activity logging error:', logError);
     }
 
     return c.json({ success: true });
@@ -3581,6 +3766,22 @@ app.get('/api/analytics/global', authMiddleware, async (c) => {
 
     // Update last visit time for user
     await updateLastVisit(c.env.DB, payload.userId);
+
+    // Log user activity
+    try {
+      await logUserActivity(
+        c.env.DB,
+        payload.userId,
+        'analytics_viewed',
+        'analytics',
+        null,
+        { days, action: 'viewed_global_analytics' },
+        c.req.header('CF-Connecting-IP'),
+        c.req.header('User-Agent')
+      );
+    } catch (logError) {
+      console.error('Activity logging error:', logError);
+    }
 
     // Get user's analytics permissions
     const canSeeFull = await canSeeFullAnalytics(c.env.DB, payload.userId);
@@ -3868,6 +4069,22 @@ app.post('/api/subscription/checkout', authMiddleware, async (c) => {
         'pending',
         new Date().toISOString()
       ).run();
+
+      // Log user activity
+      try {
+        await logUserActivity(
+          c.env.DB,
+          payload.userId,
+          'subscription_checkout',
+          'subscription',
+          planId,
+          { planId, billingCycle, amount: amountInETB, currency: 'ETB', txRef },
+          c.req.header('CF-Connecting-IP'),
+          c.req.header('User-Agent')
+        );
+      } catch (logError) {
+        console.error('Activity logging error:', logError);
+      }
 
       return c.json({
         txRef: txRef,

@@ -242,6 +242,39 @@ export async function logAdminActivity(
     .run()
 }
 
+// Log user activity
+export async function logUserActivity(
+  db: D1Database,
+  userId: string,
+  action: string,
+  resourceType: string,
+  resourceId?: string,
+  details?: any,
+  ipAddress?: string,
+  userAgent?: string,
+): Promise<void> {
+  const activityId = generateId()
+
+  await db
+    .prepare(`
+    INSERT INTO user_activity_logs (
+      id, user_id, action, resource_type, resource_id, details, ip_address, user_agent, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `)
+    .bind(
+      activityId,
+      userId,
+      action,
+      resourceType,
+      resourceId || null,
+      details ? JSON.stringify(details) : null,
+      ipAddress || null,
+      userAgent || null,
+      new Date().toISOString(),
+    )
+    .run()
+}
+
 // Create admin session
 export async function createAdminSession(
   db: D1Database,
