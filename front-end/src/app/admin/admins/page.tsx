@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { AdminHeader } from "@/components/admin-header"
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+
 import { Checkbox } from "@/components/ui/checkbox"
 import {
   DropdownMenu,
@@ -35,6 +35,18 @@ import {
 } from "lucide-react"
 import { useAdminAuth } from "@/contexts/admin-auth-context"
 import { adminApi } from "@/lib/admin-api"
+import { useToast } from "@/hooks/use-toast"
+import { Toaster } from "@/components/ui/toaster"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 interface AdminUser {
   id: string
@@ -91,14 +103,18 @@ const ROLE_PERMISSIONS = {
 
 export default function AdminUserManagement() {
   const { admin: currentAdmin, hasPermission } = useAdminAuth()
+  const { toast } = useToast()
   const [admins, setAdmins] = useState<AdminUser[]>([])
   const [loading, setLoading] = useState(true)
+  const [actionLoading, setActionLoading] = useState(false)
   const [searchTerm, setSearchTerm] = useState("")
   const [roleFilter, setRoleFilter] = useState<string>("all")
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [selectedAdmin, setSelectedAdmin] = useState<AdminUser | null>(null)
+  const [adminToDelete, setAdminToDelete] = useState<AdminUser | null>(null)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [newAdminData, setNewAdminData] = useState({
     email: "",
     name: "",
@@ -111,8 +127,7 @@ export default function AdminUserManagement() {
     fetchAdmins()
   }, [])
 
-  // Check if current admin can manage other admins
-  const canManageAdmins = hasPermission("admins", "read")
+
 
   const fetchAdmins = async () => {
     setLoading(true)
@@ -164,54 +179,134 @@ export default function AdminUserManagement() {
     }
   }
 
-  const getRoleIcon = (role: string) => {
-    switch (role) {
-      case "super_admin":
-        return <Shield className="h-4 w-4" />
-      case "admin":
-        return <Crown className="h-4 w-4" />
-      case "moderator":
-        return <UserCheck className="h-4 w-4" />
-      case "analyst":
-        return <BarChart3 className="h-4 w-4" />
-      default:
-        return <AlertTriangle className="h-4 w-4" />
-    }
-  }
+
 
   const handleCreateAdmin = async () => {
     try {
-      // API call to create admin
-      console.log("Creating admin:", newAdminData)
+      if (!newAdminData.email || !newAdminData.name || !newAdminData.password || !newAdminData.role) {
+        toast({
+          title: "Validation Error",
+          description: "Please fill in all required fields",
+          variant: "destructive",
+        })
+        return
+      }
+
+      setActionLoading(true)
+      
+      // Set permissions based on role
+      const permissions = ROLE_PERMISSIONS[newAdminData.role]
+      
+      await adminApi.createAdminUser({
+        email: newAdminData.email,
+        name: newAdminData.name,
+        password: newAdminData.password,
+        role: newAdminData.role,
+        permissions: permissions
+      })
+      
+      // Reset form and close dialog
+      setNewAdminData({
+        email: "",
+        name: "",
+        password: "",
+        role: "moderator",
+        permissions: ROLE_PERMISSIONS.moderator,
+      })
       setIsCreateDialogOpen(false)
-      fetchAdmins()
-    } catch (error) {
+      
+      // Refresh the list
+      await fetchAdmins()
+      
+      toast({
+        title: "Success",
+        description: "Admin created successfully!",
+      })
+    } catch (error: any) {
       console.error("Failed to create admin:", error)
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create admin",
+        variant: "destructive",
+      })
+    } finally {
+      setActionLoading(false)
     }
   }
 
-  const handleEditAdmin = (admin: AdminUser) => {
-    setSelectedAdmin(admin)
-    setIsEditDialogOpen(true)
+
+
+  const handleSaveAdminChanges = async () => {
+    if (!selectedAdmin) return
+    
+    try {
+      setActionLoading(true)
+      
+      await adminApi.updateAdminUser(selectedAdmin.id, {
+        name: selectedAdmin.name,
+        role: selectedAdmin.role,
+        permissions: selectedAdmin.permissions,
+        isActive: selectedAdmin.isActive
+      })
+      
+      setIsEditDialogOpen(false)
+      setSelectedAdmin(null)
+      await fetchAdmins()
+      toast({
+        title: "Success",
+        description: "Admin updated successfully!",
+      })
+    } catch (error: any) {
+      console.error("Failed to update admin:", error)
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update admin",
+        variant: "destructive",
+      })
+    } finally {
+      setActionLoading(false)
+    }
   }
 
   const handleToggleAdminStatus = async (adminId: string) => {
     try {
-      // API call to toggle admin status
-      console.log("Toggling admin status:", adminId)
-      fetchAdmins()
-    } catch (error) {
+      await adminApi.toggleAdminStatus(adminId)
+      await fetchAdmins()
+    } catch (error: any) {
       console.error("Failed to toggle admin status:", error)
+      toast({
+        title: "Error",
+        description: error.message || "Failed to toggle admin status",
+        variant: "destructive",
+      })
     }
   }
 
-  const handleDeleteAdmin = async (adminId: string) => {
+  const handleDeleteAdmin = async (admin: AdminUser) => {
+    setAdminToDelete(admin)
+    setIsDeleteDialogOpen(true)
+  }
+
+  const confirmDeleteAdmin = async () => {
+    if (!adminToDelete) return
+    
     try {
-      // API call to delete admin
-      console.log("Deleting admin:", adminId)
-      fetchAdmins()
-    } catch (error) {
+      await adminApi.deleteAdminUser(adminToDelete.id)
+      await fetchAdmins()
+      toast({
+        title: "Success",
+        description: "Admin deleted successfully!",
+      })
+    } catch (error: any) {
       console.error("Failed to delete admin:", error)
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete admin",
+        variant: "destructive",
+      })
+    } finally {
+      setIsDeleteDialogOpen(false)
+      setAdminToDelete(null)
     }
   }
 
@@ -300,7 +395,9 @@ export default function AdminUserManagement() {
                 <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)} className="w-full sm:w-auto">
                   Cancel
                 </Button>
-                <Button onClick={handleCreateAdmin} className="w-full sm:w-auto">Create Admin</Button>
+                <Button onClick={handleCreateAdmin} className="w-full sm:w-auto" disabled={actionLoading}>
+                  {actionLoading ? "Creating..." : "Create Admin"}
+                </Button>
               </div>
             </DialogContent>
           </Dialog>
@@ -396,8 +493,18 @@ export default function AdminUserManagement() {
                 </Select>
               </div>
               <div className="space-y-3">
-                {filteredAdmins.map((admin) => (
-                  <div key={admin.id} className="flex items-center justify-between p-3 border rounded-lg">
+                {loading ? (
+                  <div className="text-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+                    <p className="mt-2 text-muted-foreground">Loading admins...</p>
+                  </div>
+                ) : filteredAdmins.length === 0 ? (
+                  <div className="text-center py-8">
+                    <p className="text-muted-foreground">No admins found</p>
+                  </div>
+                ) : (
+                  filteredAdmins.map((admin) => (
+                    <div key={admin.id} className="flex items-center justify-between p-3 border rounded-lg">
                     <div className="flex items-center gap-3 min-w-0 flex-1">
                       <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-medium flex-shrink-0">
                         {admin.name.charAt(0).toUpperCase()}
@@ -431,10 +538,25 @@ export default function AdminUserManagement() {
                             <Edit className="mr-2 h-4 w-4" />
                             Edit Admin
                           </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => handleToggleAdminStatus(admin.id)}
+                          >
+                            {admin.isActive ? (
+                              <>
+                                <XCircle className="mr-2 h-4 w-4" />
+                                Deactivate
+                              </>
+                            ) : (
+                              <>
+                                <CheckCircle className="mr-2 h-4 w-4" />
+                                Activate
+                              </>
+                            )}
+                          </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem
                             className="text-destructive"
-                            onClick={() => handleDeleteAdmin(admin.id)}
+                            onClick={() => handleDeleteAdmin(admin)}
                           >
                             <Trash2 className="mr-2 h-4 w-4" />
                             Delete Admin
@@ -443,7 +565,8 @@ export default function AdminUserManagement() {
                       </DropdownMenu>
                     </div>
                   </div>
-                ))}
+                ))
+                )}
               </div>
             </div>
           </CardContent>
@@ -461,16 +584,28 @@ export default function AdminUserManagement() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="edit-email">Email</Label>
-                  <Input id="edit-email" defaultValue={selectedAdmin.email} />
+                  <Input 
+                    id="edit-email" 
+                    value={selectedAdmin.email} 
+                    disabled 
+                    className="bg-muted"
+                  />
                 </div>
                 <div>
                   <Label htmlFor="edit-name">Name</Label>
-                  <Input id="edit-name" defaultValue={selectedAdmin.name} />
+                  <Input 
+                    id="edit-name" 
+                    value={selectedAdmin.name}
+                    onChange={(e) => setSelectedAdmin({ ...selectedAdmin, name: e.target.value })}
+                  />
                 </div>
               </div>
               <div>
                 <Label htmlFor="edit-role">Role</Label>
-                <Select defaultValue={selectedAdmin.role}>
+                <Select 
+                  value={selectedAdmin.role} 
+                  onValueChange={(value: any) => setSelectedAdmin({ ...selectedAdmin, role: value })}
+                >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -514,7 +649,9 @@ export default function AdminUserManagement() {
               </div>
 
               <div className="flex gap-2">
-                <Button className="flex-1">Save Changes</Button>
+                <Button className="flex-1" onClick={handleSaveAdminChanges} disabled={actionLoading}>
+                  {actionLoading ? "Saving..." : "Save Changes"}
+                </Button>
                 <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
                   Cancel
                 </Button>
@@ -523,6 +660,32 @@ export default function AdminUserManagement() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Admin User</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete {adminToDelete?.name} ({adminToDelete?.email})? 
+              This action cannot be undone and will permanently remove this admin user from the system.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDeleteAdmin}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={actionLoading}
+            >
+              {actionLoading ? "Deleting..." : "Delete Admin"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      
+      <Toaster />
     </div>
   )
 }
+

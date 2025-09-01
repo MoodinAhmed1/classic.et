@@ -92,6 +92,12 @@ export const adminApi = {
     })
   },
 
+  toggleAdminStatus: async (id: string) => {
+    return adminApiRequest<{ success: boolean; isActive: boolean }>(`/api/admin/users/${id}/toggle-status`, {
+      method: "PATCH",
+    })
+  },
+
   // User Management
   getUsers: async (params?: { limit?: number; offset?: number; search?: string; tier?: string }) => {
     const query = new URLSearchParams()
@@ -316,6 +322,22 @@ export const adminApi = {
       logs: any[]
       total: number
     }>(`/api/admin/activity-logs?${query}`)
+  },
+
+  // User Activity Logs
+  getUserActivityLogs: async (params?: { limit?: number; offset?: number; userId?: string; action?: string; resourceType?: string }) => {
+    const query = new URLSearchParams()
+    if (params?.limit) query.set("limit", params.limit.toString())
+    if (params?.offset) query.set("offset", params.offset.toString())
+    if (params?.userId) query.set("userId", params.userId)
+    if (params?.action) query.set("action", params.action)
+    if (params?.resourceType) query.set("resourceType", params.resourceType)
+
+    return adminApiRequest<{
+      logs: any[]
+      total: number
+      pagination: { limit: number; offset: number; hasMore: boolean }
+    }>(`/api/admin/user-activity-logs?${query}`)
   },
 
   // Notifications

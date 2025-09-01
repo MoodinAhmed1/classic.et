@@ -81,7 +81,7 @@ INSERT INTO admin_users (
   'Super Administrator',
   '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9', -- sha256(admin123)
   'super_admin',
-  '["all"]', -- Super admin has all permissions
+  '{"users":["read","write","delete"],"links":["read","write","delete"],"subscriptions":["read","write","delete"],"analytics":["read","write"],"system":["read","write","delete"],"admins":["read","write","delete"]}', -- Super admin has all permissions
   true
 );
 

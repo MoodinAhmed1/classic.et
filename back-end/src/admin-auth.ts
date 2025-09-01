@@ -26,6 +26,8 @@ export interface AdminSession {
   created_at: string
 }
 
+// Utility functions
+
 // Password hashing utilities (adapted from existing auth)
 // --- Admin password hashing (PBKDF2 with SHA-256) with legacy SHA-256 fallback ---
 const PBKDF2_ITERATIONS = 150000
@@ -118,7 +120,24 @@ export function generateSessionToken(): string {
 
 // Generate unique ID
 export function generateId(): string {
-  return crypto.randomUUID()
+  // Custom UUID v4 generator for Cloudflare Workers compatibility
+  const chars = '0123456789abcdef';
+  let uuid = '';
+  
+  // Generate 8-4-4-4-12 format
+  for (let i = 0; i < 36; i++) {
+    if (i === 8 || i === 13 || i === 18 || i === 23) {
+      uuid += '-';
+    } else if (i === 14) {
+      uuid += '4'; // Version 4
+    } else if (i === 19) {
+      uuid += chars.charAt((Math.random() * 4) | 8); // Variant bits
+    } else {
+      uuid += chars.charAt((Math.random() * 16) | 0);
+    }
+  }
+  
+  return uuid;
 }
 
 // Admin authentication middleware
@@ -207,16 +226,15 @@ export async function logAdminActivity(
 
   await db
     .prepare(`
-    INSERT INTO admin_activity_log (
-      id, admin_id, action, resource_type, resource_id, details, ip_address, user_agent
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO admin_activity_logs (
+      id, admin_user_id, action, resource, details, ip_address, user_agent
+    ) VALUES (?, ?, ?, ?, ?, ?, ?)
   `)
     .bind(
       activityId,
       adminId,
       action,
       resourceType,
-      resourceId || null,
       details ? JSON.stringify(details) : null,
       ipAddress || null,
       userAgent || null,

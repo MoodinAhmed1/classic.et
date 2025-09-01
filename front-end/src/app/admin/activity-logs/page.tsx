@@ -25,15 +25,21 @@ import {
 
 interface ActivityLog {
   id: string
-  admin_user_id: string
-  admin_name: string
-  admin_email: string
+  admin_user_id?: string
+  admin_name?: string
+  admin_email?: string
+  user_id?: string
+  user_name?: string
+  user_email?: string
   action: string
   resource: string
+  resource_type?: string
+  resource_id?: string
   details: string
   ip_address: string
   user_agent: string
   created_at: string
+  log_type: 'admin' | 'user'
 }
 
 export default function ActivityLogsPage() {
@@ -43,28 +49,74 @@ export default function ActivityLogsPage() {
   const [actionFilter, setActionFilter] = useState<string>("all")
   const [adminFilter, setAdminFilter] = useState<string>("all")
   const [resourceFilter, setResourceFilter] = useState<string>("all")
+  const [logTypeFilter, setLogTypeFilter] = useState<string>("all")
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [totalLogs, setTotalLogs] = useState(0)
 
   useEffect(() => {
     fetchLogs()
-  }, [currentPage, actionFilter, adminFilter, resourceFilter])
+  }, [currentPage, actionFilter, adminFilter, resourceFilter, logTypeFilter])
 
   const fetchLogs = async () => {
     try {
       setLoading(true)
-      const params = {
-        limit: 50,
-        offset: (currentPage - 1) * 50,
-        action: actionFilter !== "all" ? actionFilter : undefined,
-        adminUserId: adminFilter !== "all" ? adminFilter : undefined,
+      let allLogs: ActivityLog[] = []
+      let totalCount = 0
+
+      // Fetch admin activity logs
+      if (logTypeFilter === "all" || logTypeFilter === "admin") {
+        const adminParams = {
+          limit: 25,
+          offset: (currentPage - 1) * 25,
+          action: actionFilter !== "all" ? actionFilter : undefined,
+          adminUserId: adminFilter !== "all" ? adminFilter : undefined,
+        }
+        console.log('Fetching admin activity logs with params:', adminParams)
+        const adminResponse = await adminApi.getActivityLogs(adminParams)
+        console.log('Admin activity logs response:', adminResponse)
+        const adminLogs = adminResponse.logs.map((log: any) => ({
+          ...log,
+          log_type: 'admin' as const,
+          resource: log.resource,
+          resource_type: log.resource
+        }))
+        allLogs = [...allLogs, ...adminLogs]
+        totalCount += adminResponse.total
       }
 
-      const response = await adminApi.getActivityLogs(params)
-      setLogs(response.logs)
-      setTotalLogs(response.total)
-      setTotalPages(Math.ceil(response.total / 50))
+      // Fetch user activity logs
+      if (logTypeFilter === "all" || logTypeFilter === "user") {
+        const userParams = {
+          limit: 25,
+          offset: (currentPage - 1) * 25,
+          action: actionFilter !== "all" ? actionFilter : undefined,
+          resourceType: resourceFilter !== "all" ? resourceFilter : undefined,
+        }
+        console.log('Fetching user activity logs with params:', userParams)
+        const userResponse = await adminApi.getUserActivityLogs(userParams)
+        console.log('User activity logs response:', userResponse)
+        const userLogs = userResponse.logs.map((log: any) => ({
+          ...log,
+          log_type: 'user' as const,
+          resource: log.resource_type,
+          admin_user_id: undefined,
+          admin_name: undefined,
+          admin_email: undefined
+        }))
+        allLogs = [...allLogs, ...userLogs]
+        totalCount += userResponse.total
+      }
+
+      // Sort by created_at descending
+      allLogs.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+
+      console.log('Final combined logs:', allLogs)
+      console.log('Total count:', totalCount)
+
+      setLogs(allLogs)
+      setTotalLogs(totalCount)
+      setTotalPages(Math.ceil(totalCount / 50))
     } catch (error) {
       console.error("Failed to fetch activity logs:", error)
     } finally {
@@ -74,8 +126,10 @@ export default function ActivityLogsPage() {
 
   const filteredLogs = logs.filter((log) => {
     const matchesSearch =
-      log.admin_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      log.admin_email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (log.admin_name?.toLowerCase().includes(searchTerm.toLowerCase()) || false) ||
+      (log.admin_email?.toLowerCase().includes(searchTerm.toLowerCase()) || false) ||
+      (log.user_name?.toLowerCase().includes(searchTerm.toLowerCase()) || false) ||
+      (log.user_email?.toLowerCase().includes(searchTerm.toLowerCase()) || false) ||
       log.action.toLowerCase().includes(searchTerm.toLowerCase()) ||
       log.resource.toLowerCase().includes(searchTerm.toLowerCase()) ||
       log.details.toLowerCase().includes(searchTerm.toLowerCase())
@@ -86,33 +140,47 @@ export default function ActivityLogsPage() {
   })
 
   const getActionColor = (action: string) => {
-    switch (action) {
-      case "create":
-        return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-      case "update":
-        return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
-      case "delete":
-        return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
-      case "read":
-        return "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200"
-      default:
-        return "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200"
+    if (action.includes('create') || action.includes('created') || action.includes('register')) {
+      return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
     }
+    if (action.includes('update') || action.includes('updated') || action.includes('change')) {
+      return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
+    }
+    if (action.includes('delete') || action.includes('deleted') || action.includes('remove')) {
+      return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
+    }
+    if (action.includes('login') || action.includes('logout') || action.includes('auth')) {
+      return "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200"
+    }
+    if (action.includes('click') || action.includes('view') || action.includes('read')) {
+      return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
+    }
+    if (action.includes('payment') || action.includes('subscription') || action.includes('upgrade')) {
+      return "bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200"
+    }
+    return "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200"
   }
 
   const getActionIcon = (action: string) => {
-    switch (action) {
-      case "create":
-        return <CheckCircle className="h-4 w-4" />
-      case "update":
-        return <RefreshCw className="h-4 w-4" />
-      case "delete":
-        return <AlertTriangle className="h-4 w-4" />
-      case "read":
-        return <Activity className="h-4 w-4" />
-      default:
-        return <Activity className="h-4 w-4" />
+    if (action.includes('create') || action.includes('created') || action.includes('register')) {
+      return <CheckCircle className="h-4 w-4" />
     }
+    if (action.includes('update') || action.includes('updated') || action.includes('change')) {
+      return <RefreshCw className="h-4 w-4" />
+    }
+    if (action.includes('delete') || action.includes('deleted') || action.includes('remove')) {
+      return <AlertTriangle className="h-4 w-4" />
+    }
+    if (action.includes('login') || action.includes('logout') || action.includes('auth')) {
+      return <Shield className="h-4 w-4" />
+    }
+    if (action.includes('click') || action.includes('view') || action.includes('read')) {
+      return <Activity className="h-4 w-4" />
+    }
+    if (action.includes('payment') || action.includes('subscription') || action.includes('upgrade')) {
+      return <User className="h-4 w-4" />
+    }
+    return <Activity className="h-4 w-4" />
   }
 
   const formatDate = (dateString: string) => {
@@ -121,9 +189,11 @@ export default function ActivityLogsPage() {
 
   const handleExport = () => {
     const csvContent = [
-      ["Admin", "Action", "Resource", "Details", "IP Address", "Date"],
+      ["Type", "User/Admin", "Email", "Action", "Resource", "Details", "IP Address", "Date"],
       ...filteredLogs.map((log) => [
-        log.admin_name,
+        log.log_type === 'admin' ? 'Admin' : 'User',
+        log.log_type === 'admin' ? log.admin_name : log.user_name,
+        log.log_type === 'admin' ? log.admin_email : log.user_email,
         log.action,
         log.resource,
         log.details,
@@ -240,6 +310,16 @@ export default function ActivityLogsPage() {
               />
             </div>
             <div className="grid grid-cols-2 gap-1 md:flex md:gap-3">
+              <Select value={logTypeFilter} onValueChange={setLogTypeFilter}>
+                <SelectTrigger className="w-full md:w-40 text-xs md:text-sm">
+                  <SelectValue placeholder="Filter by type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Types</SelectItem>
+                  <SelectItem value="admin">Admin Only</SelectItem>
+                  <SelectItem value="user">User Only</SelectItem>
+                </SelectContent>
+              </Select>
               <Select value={actionFilter} onValueChange={setActionFilter}>
                 <SelectTrigger className="w-full md:w-40 text-xs md:text-sm">
                   <SelectValue placeholder="Filter by action" />
@@ -297,8 +377,15 @@ export default function ActivityLogsPage() {
                           <Badge variant="outline" className="text-xs">{log.resource.toUpperCase()}</Badge>
                         </div>
                         <div className="min-w-0">
-                          <div className="font-medium text-sm truncate">{log.admin_name}</div>
-                          <div className="text-xs text-muted-foreground truncate">{log.admin_email}</div>
+                          <div className="font-medium text-sm truncate">
+                            {log.log_type === 'admin' ? log.admin_name : log.user_name}
+                          </div>
+                          <div className="text-xs text-muted-foreground truncate">
+                            {log.log_type === 'admin' ? log.admin_email : log.user_email}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {log.log_type === 'admin' ? 'Admin' : 'User'}
+                          </div>
                         </div>
                         <div className="bg-muted/50 p-2 rounded text-xs">
                           <div className="text-muted-foreground mb-1">Details:</div>
@@ -327,7 +414,7 @@ export default function ActivityLogsPage() {
             <Table className="min-w-[700px]">
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-48">Admin</TableHead>
+                  <TableHead className="w-48">User/Admin</TableHead>
                   <TableHead className="w-24">Action</TableHead>
                   <TableHead className="w-24">Resource</TableHead>
                   <TableHead className="min-w-0">Details</TableHead>
@@ -353,8 +440,15 @@ export default function ActivityLogsPage() {
                     <TableRow key={log.id}>
                       <TableCell className="min-w-0">
                         <div className="min-w-0">
-                          <div className="font-medium text-sm truncate">{log.admin_name}</div>
-                          <div className="text-xs text-muted-foreground truncate">{log.admin_email}</div>
+                          <div className="font-medium text-sm truncate">
+                            {log.log_type === 'admin' ? log.admin_name : log.user_name}
+                          </div>
+                          <div className="text-xs text-muted-foreground truncate">
+                            {log.log_type === 'admin' ? log.admin_email : log.user_email}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {log.log_type === 'admin' ? 'Admin' : 'User'}
+                          </div>
                         </div>
                       </TableCell>
                       <TableCell>

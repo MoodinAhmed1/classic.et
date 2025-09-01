@@ -6,7 +6,7 @@ import { cors } from 'hono/cors';
 import { jwt, sign, verify } from 'hono/jwt';
 import { setCookie, getCookie } from 'hono/cookie';
 import { UAParser } from 'ua-parser-js';
-import { adminAuthMiddleware, requirePermission, getAdminByEmail, updateAdminLastLogin, verifyAdminPassword, hashAdminPasswordPBKDF2 } from './admin-auth';
+import { adminAuthMiddleware, requirePermission, getAdminByEmail, updateAdminLastLogin, verifyAdminPassword, hashAdminPasswordPBKDF2, generateId, logAdminActivity } from './admin-auth';
 import { 
   checkUsageLimit, 
   incrementUsage, 
@@ -35,6 +35,13 @@ interface Env {
   CHAPA_PUBLIC_KEY: string;
   CHAPA_ENCRYPTION_KEY: string;
   CHAPA_WEBHOOK_SECRET?: string;
+}
+
+// Extend Hono context to include adminUser
+declare module 'hono' {
+  interface ContextVariableMap {
+    adminUser: any;
+  }
 }
 
 interface User {
@@ -87,9 +94,6 @@ app.use('*', async (c, next) => {
 });
 
 // Utility functions (keep existing ones)
-function generateId(): string {
-  return crypto.randomUUID();
-}
 
 function generateShortCode(): string {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
@@ -1821,6 +1825,13 @@ app.post('/api/admin/auth/login', async (c) => {
       maxAge: 60 * 60 * 8,
     });
 
+    // Log the activity
+    try {
+      await logAdminActivity(c.env.DB, (admin as any).id, 'admin_login', 'auth', (admin as any).id, { email: (admin as any).email }, c.req.header('CF-Connecting-IP'), c.req.header('User-Agent'));
+    } catch (logError) {
+      console.error('Activity logging error:', logError);
+    }
+
     const adminResponse = {
       id: (admin as any).id,
       email: (admin as any).email,
@@ -2086,8 +2097,43 @@ app.get('/api/admin/users/regular', adminAuthMiddleware as any, async (c) => {
 
 
 
+// Test endpoint to check database connectivity
+app.get('/api/admin/test-db', async (c) => {
+  try {
+    // Check if admin_users table exists
+    const tableCheck = await (c.env.DB as any)
+      .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='admin_users'")
+      .first();
+    
+    if (!tableCheck) {
+      return c.json({ 
+        error: 'Admin tables not found', 
+        message: 'Please run the admin system migration first',
+        availableTables: await (c.env.DB as any)
+          .prepare("SELECT name FROM sqlite_master WHERE type='table'")
+          .all()
+      }, 404);
+    }
+    
+    // Check table structure
+    const tableInfo = await (c.env.DB as any)
+      .prepare("PRAGMA table_info(admin_users)")
+      .all();
+    
+    return c.json({ 
+      success: true, 
+      message: 'Admin tables exist',
+      tableStructure: tableInfo?.results || []
+    });
+  } catch (e) {
+    console.error('Database test error:', e);
+    const errorMessage = e instanceof Error ? e.message : 'Unknown error';
+    return c.json({ error: 'Database connection failed', details: errorMessage }, 500);
+  }
+});
+
 // Admin: list admin users
-app.get('/api/admin/users', adminAuthMiddleware as any, async (c) => {
+app.get('/api/admin/users', adminAuthMiddleware as any, requirePermission('admins', 'read') as any, async (c) => {
   try {
     const rows = await (c.env.DB as any)
       .prepare('SELECT id, email, name, role, permissions, is_active, last_login_at, created_at FROM admin_users ORDER BY created_at DESC')
@@ -2110,35 +2156,106 @@ app.get('/api/admin/users', adminAuthMiddleware as any, async (c) => {
 });
 
 // Admin: create admin user
-app.post('/api/admin/users', adminAuthMiddleware as any, async (c) => {
+app.post('/api/admin/users', adminAuthMiddleware as any, requirePermission('admins', 'write') as any, async (c) => {
   try {
     const body = await c.req.json();
     const { email, name, password, role, permissions } = body || {};
     if (!email || !name || !password || !role) {
       return c.json({ error: 'Missing required fields' }, 400);
     }
-    const id = crypto.randomUUID();
+    
+    // Check if email already exists
+    const existingAdmin = await (c.env.DB as any)
+      .prepare('SELECT id FROM admin_users WHERE email = ?')
+      .bind(email)
+      .first();
+    
+    if (existingAdmin) {
+      return c.json({ error: 'Admin with this email already exists' }, 400);
+    }
+    
+    const id = generateId();
     const permsJson = JSON.stringify(permissions || {});
     // Use admin-specific password hashing
     const pwdHash = await hashAdminPasswordPBKDF2(password);
     const now = new Date().toISOString();
-    await (c.env.DB as any)
-      .prepare('INSERT INTO admin_users (id, email, name, password_hash, role, permissions, is_active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)')
-      .bind(id, email, name, pwdHash, role, permsJson, now, now)
-      .run();
+    const currentAdmin = c.get('adminUser') as any;
+    
+    console.log('Creating admin with data:', { id, email, name, role, permissions: permsJson, currentAdminId: currentAdmin.id });
+    console.log('Password hash length:', pwdHash.length);
+    console.log('Current admin object:', currentAdmin);
+    
+    // First check if the table exists
+    try {
+      const tableCheck = await (c.env.DB as any)
+        .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='admin_users'")
+        .first();
+      
+      if (!tableCheck) {
+        console.error('Admin users table does not exist');
+        return c.json({ error: 'Admin system not initialized. Please run migrations first.' }, 500);
+      }
+    } catch (tableError: any) {
+      console.error('Table check error:', tableError);
+      return c.json({ error: 'Database schema check failed', details: tableError.message }, 500);
+    }
+    
+    try {
+      console.log('About to execute SQL with params:', { id, email, name, role, permsJson, now, createdBy: currentAdmin.id || null });
+      const result = await (c.env.DB as any)
+        .prepare('INSERT INTO admin_users (id, email, name, password_hash, role, permissions, is_active, created_at, updated_at, created_by) VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?)')
+        .bind(id, email, name, pwdHash, role, permsJson, now, now, currentAdmin.id || null)
+        .run();
+      
+      console.log('Admin user created successfully, result:', result);
+    } catch (dbError: any) {
+      console.error('Database error:', dbError);
+      console.error('SQL error details:', {
+        message: dbError.message,
+        code: dbError.code,
+        stack: dbError.stack
+      });
+      throw dbError;
+    }
+    
+    // Log the activity
+    const adminUser = c.get('adminUser') as any;
+    try {
+      await logAdminActivity(c.env.DB, adminUser.id, 'admin_created', 'admin_user', id, { email, name, role }, c.req.header('CF-Connecting-IP'), c.req.header('User-Agent'));
+      console.log('Activity logged successfully');
+    } catch (logError) {
+      console.error('Activity logging error:', logError);
+      // Don't fail the entire operation if logging fails
+    }
+    
     return c.json({ adminUser: { id, email, name, role, permissions: permissions || {}, is_active: true, created_at: now } });
   } catch (e) {
     console.error('Create admin error:', e);
-    return c.json({ error: 'Internal server error' }, 500);
+    const errorMessage = e instanceof Error ? e.message : 'Unknown error';
+    const errorStack = e instanceof Error ? e.stack : undefined;
+    const errorName = e instanceof Error ? e.name : 'Unknown';
+    console.error('Error details:', {
+      message: errorMessage,
+      stack: errorStack,
+      name: errorName
+    });
+    return c.json({ error: 'Internal server error', details: errorMessage }, 500);
   }
 });
 
 // Admin: update admin user
-app.put('/api/admin/users/:id', adminAuthMiddleware as any, async (c) => {
+app.put('/api/admin/users/:id', adminAuthMiddleware as any, requirePermission('admins', 'write') as any, async (c) => {
   try {
     const id = c.req.param('id');
     const body = await c.req.json();
     const { name, role, permissions, isActive } = body || {};
+    
+    // Prevent updating own role to avoid permission issues
+    const currentAdmin = c.get('adminUser') as any;
+    if (id === currentAdmin.id && role && role !== currentAdmin.role) {
+      return c.json({ error: 'Cannot change your own role' }, 400);
+    }
+    
     const fields: string[] = [];
     const params: any[] = [];
     if (name !== undefined) { fields.push('name = ?'); params.push(name); }
@@ -2147,14 +2264,21 @@ app.put('/api/admin/users/:id', adminAuthMiddleware as any, async (c) => {
     if (isActive !== undefined) { fields.push('is_active = ?'); params.push(!!isActive ? 1 : 0); }
     fields.push('updated_at = ?'); params.push(new Date().toISOString());
     params.push(id);
+    
+    if (fields.length === 1) { // Only updated_at
+      return c.json({ error: 'No fields to update' }, 400);
+    }
+    
     await (c.env.DB as any)
       .prepare(`UPDATE admin_users SET ${fields.join(', ')} WHERE id = ?`)
       .bind(...params)
       .run();
+    
     const row = await (c.env.DB as any)
       .prepare('SELECT id, email, name, role, permissions, is_active, last_login_at, created_at FROM admin_users WHERE id = ?')
       .bind(id)
       .first();
+    
     const adminUser = row ? {
       id: (row as any).id,
       email: (row as any).email,
@@ -2165,6 +2289,10 @@ app.put('/api/admin/users/:id', adminAuthMiddleware as any, async (c) => {
       last_login_at: (row as any).last_login_at,
       created_at: (row as any).created_at,
     } : null;
+    
+    // Log the activity
+    await logAdminActivity(c.env.DB, currentAdmin.id, 'admin_updated', 'admin_user', id, { name, role, permissions, isActive }, c.req.header('CF-Connecting-IP'), c.req.header('User-Agent'));
+    
     return c.json({ adminUser });
   } catch (e) {
     console.error('Update admin error:', e);
@@ -2173,13 +2301,78 @@ app.put('/api/admin/users/:id', adminAuthMiddleware as any, async (c) => {
 });
 
 // Admin: delete admin user
-app.delete('/api/admin/users/:id', adminAuthMiddleware as any, async (c) => {
+app.delete('/api/admin/users/:id', adminAuthMiddleware as any, requirePermission('admins', 'delete') as any, async (c) => {
   try {
     const id = c.req.param('id');
+    const currentAdmin = c.get('adminUser') as any;
+    
+    // Prevent deleting yourself
+    if (id === currentAdmin.id) {
+      return c.json({ error: 'Cannot delete your own account' }, 400);
+    }
+    
+    // Check if admin exists
+    const existingAdmin = await (c.env.DB as any)
+      .prepare('SELECT id, email, name FROM admin_users WHERE id = ?')
+      .bind(id)
+      .first();
+    
+    if (!existingAdmin) {
+      return c.json({ error: 'Admin not found' }, 400);
+    }
+    
+    // Delete the admin
     await (c.env.DB as any).prepare('DELETE FROM admin_users WHERE id = ?').bind(id).run();
+    
+    // Log the activity
+    await logAdminActivity(c.env.DB, currentAdmin.id, 'admin_deleted', 'admin_user', id, { email: existingAdmin.email, name: existingAdmin.name }, c.req.header('CF-Connecting-IP'), c.req.header('User-Agent'));
+    
     return c.json({ success: true });
   } catch (e) {
     console.error('Delete admin error:', e);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+// Admin: toggle admin status
+app.patch('/api/admin/users/:id/toggle-status', adminAuthMiddleware as any, requirePermission('admins', 'write') as any, async (c) => {
+  try {
+    const id = c.req.param('id');
+    const currentAdmin = c.get('adminUser') as any;
+    
+    // Prevent deactivating yourself
+    if (id === currentAdmin.id) {
+      return c.json({ error: 'Cannot deactivate your own account' }, 400);
+    }
+    
+    // Check if admin exists and get current status
+    const existingAdmin = await (c.env.DB as any)
+      .prepare('SELECT id, email, name, is_active FROM admin_users WHERE id = ?')
+      .bind(id)
+      .first();
+    
+    if (!existingAdmin) {
+      return c.json({ error: 'Admin not found' }, 400);
+    }
+    
+    // Toggle the status
+    const newStatus = !existingAdmin.is_active;
+    await (c.env.DB as any)
+      .prepare('UPDATE admin_users SET is_active = ?, updated_at = ? WHERE id = ?')
+      .bind(newStatus ? 1 : 0, new Date().toISOString(), id)
+      .run();
+    
+    // Log the activity
+    await logAdminActivity(c.env.DB, currentAdmin.id, 'admin_status_toggled', 'admin_user', id, { 
+      email: existingAdmin.email, 
+      name: existingAdmin.name, 
+      previousStatus: existingAdmin.is_active, 
+      newStatus 
+    }, c.req.header('CF-Connecting-IP'), c.req.header('User-Agent'));
+    
+    return c.json({ success: true, isActive: newStatus });
+  } catch (e) {
+    console.error('Toggle admin status error:', e);
     return c.json({ error: 'Internal server error' }, 500);
   }
 });
@@ -4158,6 +4351,14 @@ app.post('/api/admin/users/regular', adminAuthMiddleware as any, async (c) => {
       FROM users WHERE id = ?
     `).bind(userId).first() as any;
 
+    // Log the activity
+    const adminUser = c.get('adminUser') as any;
+    try {
+      await logAdminActivity(c.env.DB, adminUser.id, 'user_created', 'user', userId, { email, name, tier }, c.req.header('CF-Connecting-IP'), c.req.header('User-Agent'));
+    } catch (logError) {
+      console.error('Activity logging error:', logError);
+    }
+
     return c.json({ 
       user: {
         id: newUser.id,
@@ -4206,6 +4407,14 @@ app.put('/api/admin/users/regular/:id', adminAuthMiddleware as any, async (c) =>
       return c.json({ error: 'User not found' }, 404);
     }
 
+    // Log the activity
+    const adminUser = c.get('adminUser') as any;
+    try {
+      await logAdminActivity(c.env.DB, adminUser.id, 'user_updated', 'user', id, { name, email, tier, subscriptionStatus }, c.req.header('CF-Connecting-IP'), c.req.header('User-Agent'));
+    } catch (logError) {
+      console.error('Activity logging error:', logError);
+    }
+
     return c.json({ 
       user: {
         id: updatedUser.id,
@@ -4229,6 +4438,9 @@ app.delete('/api/admin/users/regular/:id', adminAuthMiddleware as any, async (c)
   try {
     const id = c.req.param('id');
     
+    // Get user details before deletion for logging
+    const userToDelete = await c.env.DB.prepare('SELECT email, name FROM users WHERE id = ?').bind(id).first() as any;
+    
     // Delete user's links first
     await c.env.DB.prepare('DELETE FROM links WHERE user_id = ?').bind(id).run();
     
@@ -4246,6 +4458,14 @@ app.delete('/api/admin/users/regular/:id', adminAuthMiddleware as any, async (c)
     
     // Finally delete the user
     await c.env.DB.prepare('DELETE FROM users WHERE id = ?').bind(id).run();
+    
+    // Log the activity
+    const adminUser = c.get('adminUser') as any;
+    try {
+      await logAdminActivity(c.env.DB, adminUser.id, 'user_deleted', 'user', id, { email: userToDelete?.email, name: userToDelete?.name }, c.req.header('CF-Connecting-IP'), c.req.header('User-Agent'));
+    } catch (logError) {
+      console.error('Activity logging error:', logError);
+    }
     
     return c.json({ success: true });
   } catch (e) {
@@ -4288,6 +4508,210 @@ app.get('/api/admin/users/regular/:id', adminAuthMiddleware as any, async (c) =>
     });
   } catch (e) {
     console.error('Get user error:', e);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+// Admin: get activity logs
+app.get('/api/admin/activity-logs', adminAuthMiddleware as any, async (c) => {
+  try {
+    const limit = Math.max(1, Math.min(200, parseInt((c.req.query('limit') as string) || '50')));
+    const offset = Math.max(0, parseInt((c.req.query('offset') as string) || '0'));
+    const adminUserId = c.req.query('adminUserId') || '';
+    const action = c.req.query('action') || '';
+
+    // Build the query with filters
+    let whereConditions = [];
+    let queryParams = [];
+
+    if (adminUserId) {
+      whereConditions.push('a.admin_user_id = ?');
+      queryParams.push(adminUserId);
+    }
+
+    if (action) {
+      whereConditions.push('a.action = ?');
+      queryParams.push(action);
+    }
+
+    const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
+
+    // Get total count
+    const countQuery = `
+      SELECT COUNT(*) as total
+      FROM admin_activity_logs a
+      ${whereClause}
+    `;
+    const countResult = await (c.env.DB as any)
+      .prepare(countQuery)
+      .bind(...queryParams)
+      .first() as any;
+    const total = Number(countResult?.total || 0);
+
+    // Get activity logs with admin user details
+    const logsQuery = `
+      SELECT 
+        a.id,
+        a.admin_user_id,
+        au.name as admin_name,
+        au.email as admin_email,
+        a.action,
+        a.resource,
+        a.details,
+        a.ip_address,
+        a.user_agent,
+        a.created_at
+      FROM admin_activity_logs a
+      LEFT JOIN admin_users au ON a.admin_user_id = au.id
+      ${whereClause}
+      ORDER BY a.created_at DESC
+      LIMIT ? OFFSET ?
+    `;
+    
+    const logsResult = await (c.env.DB as any)
+      .prepare(logsQuery)
+      .bind(...queryParams, limit, offset)
+      .all();
+
+    const logs = (logsResult?.results || []).map((log: any) => ({
+      id: log.id,
+      admin_user_id: log.admin_user_id,
+      admin_name: log.admin_name || 'Unknown Admin',
+      admin_email: log.admin_email || 'unknown@example.com',
+      action: log.action,
+      resource: log.resource,
+      details: log.details,
+      ip_address: log.ip_address,
+      user_agent: log.user_agent,
+      created_at: log.created_at
+    }));
+
+    return c.json({
+      logs,
+      total,
+      pagination: {
+        limit,
+        offset,
+        hasMore: offset + limit < total
+      }
+    });
+  } catch (e) {
+    console.error('Get activity logs error:', e);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+// Admin: get user activity logs
+app.get('/api/admin/user-activity-logs', adminAuthMiddleware as any, async (c) => {
+  try {
+    // Check if user_activity_logs table exists
+    const tableCheck = await (c.env.DB as any)
+      .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='user_activity_logs'")
+      .first();
+
+    if (!tableCheck) {
+      // Table doesn't exist yet, return empty result
+      return c.json({
+        logs: [],
+        total: 0,
+        pagination: {
+          limit: 50,
+          offset: 0,
+          hasMore: false
+        }
+      });
+    }
+
+    const limit = Math.max(1, Math.min(200, parseInt((c.req.query('limit') as string) || '50')));
+    const offset = Math.max(0, parseInt((c.req.query('offset') as string) || '0'));
+    const userId = c.req.query('userId') || '';
+    const action = c.req.query('action') || '';
+    const resourceType = c.req.query('resourceType') || '';
+
+    // Build the query with filters
+    let whereConditions = [];
+    let queryParams = [];
+
+    if (userId) {
+      whereConditions.push('u.user_id = ?');
+      queryParams.push(userId);
+    }
+
+    if (action) {
+      whereConditions.push('u.action = ?');
+      queryParams.push(action);
+    }
+
+    if (resourceType) {
+      whereConditions.push('u.resource_type = ?');
+      queryParams.push(resourceType);
+    }
+
+    const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
+
+    // Get total count
+    const countQuery = `
+      SELECT COUNT(*) as total
+      FROM user_activity_logs u
+      ${whereClause}
+    `;
+    const countResult = await (c.env.DB as any)
+      .prepare(countQuery)
+      .bind(...queryParams)
+      .first() as any;
+    const total = Number(countResult?.total || 0);
+
+    // Get user activity logs with user details
+    const logsQuery = `
+      SELECT 
+        u.id,
+        u.user_id,
+        usr.name as user_name,
+        usr.email as user_email,
+        u.action,
+        u.resource_type,
+        u.resource_id,
+        u.details,
+        u.ip_address,
+        u.user_agent,
+        u.created_at
+      FROM user_activity_logs u
+      LEFT JOIN users usr ON u.user_id = usr.id
+      ${whereClause}
+      ORDER BY u.created_at DESC
+      LIMIT ? OFFSET ?
+    `;
+    
+    const logsResult = await (c.env.DB as any)
+      .prepare(logsQuery)
+      .bind(...queryParams, limit, offset)
+      .all();
+
+    const logs = (logsResult?.results || []).map((log: any) => ({
+      id: log.id,
+      user_id: log.user_id,
+      user_name: log.user_name,
+      user_email: log.user_email,
+      action: log.action,
+      resource_type: log.resource_type,
+      resource_id: log.resource_id,
+      details: log.details,
+      ip_address: log.ip_address,
+      user_agent: log.user_agent,
+      created_at: log.created_at
+    }));
+
+    return c.json({
+      logs,
+      total,
+      pagination: {
+        limit,
+        offset,
+        hasMore: offset + limit < total
+      }
+    });
+  } catch (e) {
+    console.error('Get user activity logs error:', e);
     return c.json({ error: 'Internal server error' }, 500);
   }
 });
