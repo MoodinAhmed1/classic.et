@@ -3774,7 +3774,7 @@ app.get('/api/analytics/global', authMiddleware, async (c) => {
         payload.userId,
         'analytics_viewed',
         'analytics',
-        null,
+        undefined,
         { days, action: 'viewed_global_analytics' },
         c.req.header('CF-Connecting-IP'),
         c.req.header('User-Agent')
