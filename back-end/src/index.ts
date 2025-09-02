@@ -1847,10 +1847,10 @@ app.post('/api/auth/logout', async (c) => {
           try {
             await logUserActivity(
               c.env.DB,
-              payload.userId,
+              payload.userId as string,
               'user_logout',
               'auth',
-              payload.userId,
+              payload.userId as string,
               { action: 'logout' },
               c.req.header('CF-Connecting-IP'),
               c.req.header('User-Agent')
