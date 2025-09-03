@@ -111,7 +111,7 @@ export default function SettingsPage() {
   const handleSave = async () => {
     try {
       setSaving(true)
-      await adminApi.updateSystemSettings(settings)
+      await adminApi.updateSystemSettings({ settings })
       toast({
         title: "Success",
         description: "Settings saved successfully",

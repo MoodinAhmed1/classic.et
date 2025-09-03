@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react"
 import { adminApi } from "@/lib/admin-api"
-import { AdminHeader } from "@/components/admin-header"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -11,7 +10,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import {
   Search,
-  Filter,
   RefreshCw,
   Download,
   Activity,
@@ -19,8 +17,9 @@ import {
   Shield,
   AlertTriangle,
   CheckCircle,
-  Clock,
   Calendar,
+  Users,
+  UserCheck,
 } from "lucide-react"
 
 interface ActivityLog {
@@ -32,7 +31,7 @@ interface ActivityLog {
   user_name?: string
   user_email?: string
   action: string
-  resource: string
+  resource?: string
   resource_type?: string
   resource_id?: string
   details: string
@@ -47,65 +46,91 @@ export default function ActivityLogsPage() {
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const [actionFilter, setActionFilter] = useState<string>("all")
-  const [adminFilter, setAdminFilter] = useState<string>("all")
   const [resourceFilter, setResourceFilter] = useState<string>("all")
   const [logTypeFilter, setLogTypeFilter] = useState<string>("all")
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [totalLogs, setTotalLogs] = useState(0)
+  const [adminLogsCount, setAdminLogsCount] = useState(0)
+  const [userLogsCount, setUserLogsCount] = useState(0)
 
   useEffect(() => {
     fetchLogs()
-  }, [currentPage, actionFilter, adminFilter, resourceFilter, logTypeFilter])
+  }, [currentPage, actionFilter, resourceFilter, logTypeFilter])
 
   const fetchLogs = async () => {
     try {
       setLoading(true)
       let allLogs: ActivityLog[] = []
       let totalCount = 0
+      let adminCount = 0
+      let userCount = 0
 
       // Fetch admin activity logs
       if (logTypeFilter === "all" || logTypeFilter === "admin") {
-        const adminParams = {
-          limit: 25,
-          offset: (currentPage - 1) * 25,
-          action: actionFilter !== "all" ? actionFilter : undefined,
-          adminUserId: adminFilter !== "all" ? adminFilter : undefined,
+        try {
+          const adminParams = {
+            limit: 50,
+            offset: (currentPage - 1) * 50,
+            action: actionFilter !== "all" ? actionFilter : undefined,
+          }
+          console.log('Fetching admin activity logs with params:', adminParams)
+          const adminResponse = await adminApi.getActivityLogs(adminParams)
+          console.log('Admin activity logs response:', adminResponse)
+          
+          if (adminResponse.logs && Array.isArray(adminResponse.logs)) {
+            const adminLogs = adminResponse.logs.map((log: any) => ({
+              ...log,
+              log_type: 'admin' as const,
+              resource: log.resource || 'unknown',
+              resource_type: log.resource || 'unknown'
+            }))
+            allLogs = [...allLogs, ...adminLogs]
+            totalCount += adminResponse.total || adminLogs.length
+            adminCount = adminResponse.total || adminLogs.length
+            console.log('Admin logs processed:', adminLogs.length)
+          } else {
+            console.log('No admin logs found or invalid response format')
+          }
+        } catch (error) {
+          console.error('Failed to fetch admin logs:', error)
         }
-        console.log('Fetching admin activity logs with params:', adminParams)
-        const adminResponse = await adminApi.getActivityLogs(adminParams)
-        console.log('Admin activity logs response:', adminResponse)
-        const adminLogs = adminResponse.logs.map((log: any) => ({
-          ...log,
-          log_type: 'admin' as const,
-          resource: log.resource,
-          resource_type: log.resource
-        }))
-        allLogs = [...allLogs, ...adminLogs]
-        totalCount += adminResponse.total
       }
 
       // Fetch user activity logs
       if (logTypeFilter === "all" || logTypeFilter === "user") {
-        const userParams = {
-          limit: 25,
-          offset: (currentPage - 1) * 25,
-          action: actionFilter !== "all" ? actionFilter : undefined,
-          resourceType: resourceFilter !== "all" ? resourceFilter : undefined,
+        try {
+          const userParams = {
+            limit: 50,
+            offset: (currentPage - 1) * 50,
+            action: actionFilter !== "all" ? actionFilter : undefined,
+            resourceType: resourceFilter !== "all" ? resourceFilter : undefined,
+          }
+          console.log('Fetching user activity logs with params:', userParams)
+          const userResponse = await adminApi.getUserActivityLogs(userParams)
+          console.log('User activity logs response:', userResponse)
+          
+          if (userResponse.logs && Array.isArray(userResponse.logs)) {
+            const userLogs = userResponse.logs.map((log: any) => ({
+              ...log,
+              log_type: 'user' as const,
+              resource: log.resource_type || 'unknown', // Map resource_type to resource for consistency
+              resource_type: log.resource_type || 'unknown',
+              admin_user_id: undefined,
+              admin_name: undefined,
+              admin_email: undefined
+            }))
+            allLogs = [...allLogs, ...userLogs]
+            totalCount += userResponse.total || userLogs.length
+            userCount = userResponse.total || userLogs.length
+            console.log('User logs processed:', userLogs.length)
+          } else {
+            console.log('No user logs found or invalid response format')
+            console.log('User response structure:', userResponse)
+          }
+        } catch (error) {
+          console.error('Failed to fetch user logs:', error)
         }
-        console.log('Fetching user activity logs with params:', userParams)
-        const userResponse = await adminApi.getUserActivityLogs(userParams)
-        console.log('User activity logs response:', userResponse)
-        const userLogs = userResponse.logs.map((log: any) => ({
-          ...log,
-          log_type: 'user' as const,
-          resource: log.resource_type,
-          admin_user_id: undefined,
-          admin_name: undefined,
-          admin_email: undefined
-        }))
-        allLogs = [...allLogs, ...userLogs]
-        totalCount += userResponse.total
       }
 
       // Sort by created_at descending
@@ -113,9 +138,13 @@ export default function ActivityLogsPage() {
 
       console.log('Final combined logs:', allLogs)
       console.log('Total count:', totalCount)
+      console.log('Admin count:', adminCount)
+      console.log('User count:', userCount)
 
       setLogs(allLogs)
       setTotalLogs(totalCount)
+      setAdminLogsCount(adminCount)
+      setUserLogsCount(userCount)
       setTotalPages(Math.ceil(totalCount / 50))
     } catch (error) {
       console.error("Failed to fetch activity logs:", error)
@@ -131,10 +160,10 @@ export default function ActivityLogsPage() {
       (log.user_name?.toLowerCase().includes(searchTerm.toLowerCase()) || false) ||
       (log.user_email?.toLowerCase().includes(searchTerm.toLowerCase()) || false) ||
       log.action.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      log.resource.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (log.resource?.toLowerCase().includes(searchTerm.toLowerCase()) || false) ||
       log.details.toLowerCase().includes(searchTerm.toLowerCase())
 
-    const matchesResource = resourceFilter === "all" || log.resource === resourceFilter
+    const matchesResource = resourceFilter === "all" || (log.resource && log.resource === resourceFilter)
 
     return matchesSearch && matchesResource
   })
@@ -195,7 +224,7 @@ export default function ActivityLogsPage() {
         log.log_type === 'admin' ? log.admin_name : log.user_name,
         log.log_type === 'admin' ? log.admin_email : log.user_email,
         log.action,
-        log.resource,
+        log.resource || 'unknown',
         log.details,
         log.ip_address,
         formatDate(log.created_at),
@@ -216,103 +245,121 @@ export default function ActivityLogsPage() {
   }
 
   const uniqueActions = Array.from(new Set(logs.map((log) => log.action)))
-  const uniqueResources = Array.from(new Set(logs.map((log) => log.resource)))
-  const uniqueAdmins = Array.from(new Set(logs.map((log) => log.admin_name)))
+  const uniqueResources = Array.from(new Set(logs.map((log) => log.resource).filter(Boolean)))
 
   return (
-    <div className="space-y-3 md:space-y-6 px-1 md:px-0">
-      {/* Header */}
-      <div>
-        <h2 className="text-xl md:text-2xl lg:text-3xl font-bold text-foreground">Activity Logs</h2>
-        <p className="text-xs md:text-sm lg:text-base text-muted-foreground">Monitor system activity and admin actions</p>
-      </div>
+    <div className="min-h-screen bg-background">
+      <div className="container mx-auto px-4 py-6 space-y-6">
+        {/* Header */}
+        <div className="text-center sm:text-left">
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-foreground">Activity Logs</h1>
+          <p className="text-sm sm:text-base text-muted-foreground mt-2">
+            Monitor system activity and user actions across the platform
+          </p>
+        </div>
 
-      {/* Stats Cards */}
-      <div className="grid gap-2 grid-cols-1 xs:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 px-2 md:px-6">
-            <CardTitle className="text-xs font-medium truncate">Total Logs</CardTitle>
-            <Activity className="h-3 w-3 text-muted-foreground flex-shrink-0" />
-          </CardHeader>
-          <CardContent className="px-2 md:px-6">
-            <div className="text-base md:text-lg lg:text-2xl font-bold">{totalLogs.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground truncate">All activity records</p>
-          </CardContent>
-        </Card>
+        {/* Stats Cards - Mobile First Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Card className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950 dark:to-blue-900">
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm font-medium text-blue-900 dark:text-blue-100">Total Logs</CardTitle>
+                <Activity className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-blue-900 dark:text-blue-100">{totalLogs.toLocaleString()}</div>
+              <p className="text-xs text-blue-700 dark:text-blue-300">All activity records</p>
+            </CardContent>
+          </Card>
 
+          <Card className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-950 dark:to-green-900">
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm font-medium text-green-900 dark:text-green-100">Admin Logs</CardTitle>
+                <UserCheck className="h-5 w-5 text-green-600 dark:text-green-400" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-green-900 dark:text-green-100">{adminLogsCount.toLocaleString()}</div>
+              <p className="text-xs text-green-700 dark:text-green-300">Administrative actions</p>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-950 dark:to-purple-900">
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm font-medium text-purple-900 dark:text-purple-100">User Logs</CardTitle>
+                <Users className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-purple-900 dark:text-purple-100">{userLogsCount.toLocaleString()}</div>
+              <p className="text-xs text-purple-700 dark:text-purple-300">User activities</p>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-950 dark:to-orange-900">
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm font-medium text-orange-900 dark:text-orange-100">Today</CardTitle>
+                <Calendar className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-orange-900 dark:text-orange-100">
+                {logs.filter((log) => {
+                  const today = new Date().toDateString()
+                  return new Date(log.created_at).toDateString() === today
+                }).length}
+              </div>
+              <p className="text-xs text-orange-700 dark:text-orange-300">Actions today</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Filters and Search - Mobile First */}
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 px-2 md:px-6">
-            <CardTitle className="text-xs font-medium truncate">Today's Activity</CardTitle>
-            <Calendar className="h-3 w-3 text-muted-foreground flex-shrink-0" />
-          </CardHeader>
-          <CardContent className="px-2 md:px-6">
-            <div className="text-base md:text-lg lg:text-2xl font-bold">
-              {logs.filter((log) => {
-                const today = new Date().toDateString()
-                return new Date(log.created_at).toDateString() === today
-              }).length}
+          <CardHeader className="pb-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div>
+                <CardTitle className="text-lg sm:text-xl">Activity Logs</CardTitle>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Showing {filteredLogs.length} of {totalLogs} logs
+                </p>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <Button onClick={fetchLogs} variant="outline" className="w-full sm:w-auto">
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  <span className="hidden sm:inline">Refresh</span>
+                  <span className="sm:hidden">Sync</span>
+                </Button>
+                <Button onClick={handleExport} className="w-full sm:w-auto">
+                  <Download className="h-4 w-4 mr-2" />
+                  <span className="hidden sm:inline">Export CSV</span>
+                  <span className="sm:hidden">Export</span>
+                </Button>
+              </div>
             </div>
-            <p className="text-xs text-muted-foreground truncate">Actions today</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 px-2 md:px-6">
-            <CardTitle className="text-xs font-medium truncate">Active Admins</CardTitle>
-            <User className="h-3 w-3 text-muted-foreground flex-shrink-0" />
           </CardHeader>
-          <CardContent className="px-2 md:px-6">
-            <div className="text-base md:text-lg lg:text-2xl font-bold">{uniqueAdmins.length}</div>
-            <p className="text-xs text-muted-foreground truncate">Unique admin users</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 px-2 md:px-6">
-            <CardTitle className="text-xs font-medium truncate">Actions Types</CardTitle>
-            <Shield className="h-3 w-3 text-muted-foreground flex-shrink-0" />
-          </CardHeader>
-          <CardContent className="px-2 md:px-6">
-            <div className="text-base md:text-lg lg:text-2xl font-bold">{uniqueActions.length}</div>
-            <p className="text-xs text-muted-foreground truncate">Different action types</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Filters and Search */}
-      <Card className="mb-3 md:mb-6">
-        <CardHeader className="pb-2 px-2 md:px-6">
-          <div className="space-y-2 md:space-y-0 md:flex md:items-center md:justify-between">
-            <CardTitle className="text-base md:text-lg lg:text-xl">Activity Logs</CardTitle>
-            <div className="flex gap-2">
-              <Button onClick={fetchLogs} className="flex-1 md:flex-none">
-                <RefreshCw className="h-4 w-4 mr-2" />
-                <span className="hidden sm:inline">Refresh</span>
-                <span className="sm:hidden">Sync</span>
-              </Button>
-              <Button variant="outline" onClick={handleExport} className="flex-1 md:flex-none">
-                <Download className="h-4 w-4 mr-2" />
-                <span className="hidden sm:inline">Export</span>
-                <span className="sm:hidden">CSV</span>
-              </Button>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="px-1 md:px-6">
-          <div className="space-y-2 md:space-y-0 md:flex md:gap-3 mb-3">
-            <div className="relative flex-1 min-w-0">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+          
+          <CardContent className="space-y-4">
+            {/* Search Bar */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search logs..."
+                placeholder="Search logs by user, action, resource, or details..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10 w-full"
               />
             </div>
-            <div className="grid grid-cols-2 gap-1 md:flex md:gap-3">
+
+            {/* Filters - Mobile First Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               <Select value={logTypeFilter} onValueChange={setLogTypeFilter}>
-                <SelectTrigger className="w-full md:w-40 text-xs md:text-sm">
-                  <SelectValue placeholder="Filter by type" />
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Log Type" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Types</SelectItem>
@@ -320,184 +367,203 @@ export default function ActivityLogsPage() {
                   <SelectItem value="user">User Only</SelectItem>
                 </SelectContent>
               </Select>
+
               <Select value={actionFilter} onValueChange={setActionFilter}>
-                <SelectTrigger className="w-full md:w-40 text-xs md:text-sm">
-                  <SelectValue placeholder="Filter by action" />
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Action Type" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Actions</SelectItem>
-                  {uniqueActions.map((action) => (
+                  {uniqueActions.slice(0, 10).map((action) => (
                     <SelectItem key={action} value={action}>
                       {action.charAt(0).toUpperCase() + action.slice(1)}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+
               <Select value={resourceFilter} onValueChange={setResourceFilter}>
-                <SelectTrigger className="w-full md:w-40 text-xs md:text-sm">
-                  <SelectValue placeholder="Filter by resource" />
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Resource Type" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Resources</SelectItem>
-                  {uniqueResources.map((resource) => (
-                    <SelectItem key={resource} value={resource}>
-                      {resource.charAt(0).toUpperCase() + resource.slice(1)}
+                  {uniqueResources.slice(0, 10).map((resource) => (
+                    <SelectItem key={resource || 'unknown'} value={resource || 'unknown'}>
+                      {(resource || 'unknown').charAt(0).toUpperCase() + (resource || 'unknown').slice(1)}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-          </div>
 
-          {/* Mobile-first activity logs layout */}
-          <div className="block md:hidden">
-            {loading ? (
-              <div className="text-center py-6 text-muted-foreground">
-                <Clock className="h-6 w-6 mx-auto mb-2" />
-                <p className="text-xs">Loading activity logs...</p>
-              </div>
-            ) : filteredLogs.length === 0 ? (
-              <div className="text-center py-6 text-muted-foreground">
-                <Activity className="h-6 w-6 mx-auto mb-2" />
-                <p className="text-xs">No activity logs found matching your criteria.</p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {filteredLogs.map((log) => (
-                  <Card key={log.id} className="border">
-                    <CardContent className="p-2">
-                      <div className="space-y-2">
-                        <div className="flex flex-wrap items-center gap-1">
-                          <Badge className={getActionColor(log.action)} variant="outline">
-                            <span className="flex items-center gap-1 text-xs">
-                              {getActionIcon(log.action)}
-                              {log.action.toUpperCase()}
-                            </span>
-                          </Badge>
-                          <Badge variant="outline" className="text-xs">{log.resource.toUpperCase()}</Badge>
-                        </div>
-                        <div className="min-w-0">
-                          <div className="font-medium text-sm truncate">
-                            {log.log_type === 'admin' ? log.admin_name : log.user_name}
-                          </div>
-                          <div className="text-xs text-muted-foreground truncate">
-                            {log.log_type === 'admin' ? log.admin_email : log.user_email}
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            {log.log_type === 'admin' ? 'Admin' : 'User'}
-                          </div>
-                        </div>
-                        <div className="bg-muted/50 p-2 rounded text-xs">
-                          <div className="text-muted-foreground mb-1">Details:</div>
-                          <div className="break-words text-xs">{log.details}</div>
-                        </div>
-                        <div className="flex flex-wrap items-center gap-2 text-xs">
-                          <div className="min-w-0">
-                            <span className="text-muted-foreground">IP: </span>
-                            <code className="bg-muted px-1 py-0.5 rounded text-xs break-all">{log.ip_address}</code>
-                          </div>
-                        </div>
-                        <div className="flex items-center justify-between text-xs border-t pt-2">
-                          <span className="text-muted-foreground">Date:</span>
-                          <span className="font-medium text-xs">{formatDate(log.created_at)}</span>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Desktop table layout */}
-          <div className="hidden md:block rounded-md border overflow-x-auto">
-            <Table className="min-w-[700px]">
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-48">User/Admin</TableHead>
-                  <TableHead className="w-24">Action</TableHead>
-                  <TableHead className="w-24">Resource</TableHead>
-                  <TableHead className="min-w-0">Details</TableHead>
-                  <TableHead className="w-32">IP Address</TableHead>
-                  <TableHead className="w-40">Date</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {loading ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8">
-                      Loading activity logs...
-                    </TableCell>
-                  </TableRow>
-                ) : filteredLogs.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8">
-                      No activity logs found matching your criteria.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredLogs.map((log) => (
-                    <TableRow key={log.id}>
-                      <TableCell className="min-w-0">
-                        <div className="min-w-0">
-                          <div className="font-medium text-sm truncate">
-                            {log.log_type === 'admin' ? log.admin_name : log.user_name}
-                          </div>
-                          <div className="text-xs text-muted-foreground truncate">
-                            {log.log_type === 'admin' ? log.admin_email : log.user_email}
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            {log.log_type === 'admin' ? 'Admin' : 'User'}
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge className={getActionColor(log.action)} variant="outline">
-                          <span className="flex items-center gap-1 text-xs">
-                            {getActionIcon(log.action)}
-                            {log.action.toUpperCase()}
-                          </span>
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="text-xs">{log.resource.toUpperCase()}</Badge>
-                      </TableCell>
-                      <TableCell className="min-w-0">
-                        <div className="max-w-xs truncate text-sm" title={log.details}>
-                          {log.details}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <code className="text-xs bg-muted px-2 py-1 rounded">
-                          {log.ip_address}
-                        </code>
-                      </TableCell>
-                      <TableCell>
-                        <div className="text-sm">
-                          <div>{formatDate(log.created_at)}</div>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="mt-3 md:mt-4 px-1 md:px-0">
-              <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                <div className="text-xs md:text-sm text-muted-foreground text-center md:text-left">
-                  Page {currentPage} of {totalPages}
+            {/* Mobile Cards Layout */}
+            <div className="block lg:hidden">
+              {loading ? (
+                <div className="text-center py-12">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                  <p className="text-muted-foreground">Loading activity logs...</p>
                 </div>
-                <div className="flex gap-1 md:gap-2">
+              ) : filteredLogs.length === 0 ? (
+                <div className="text-center py-12">
+                  <Activity className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <p className="text-muted-foreground">No activity logs found matching your criteria.</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {filteredLogs.map((log) => (
+                    <Card key={log.id} className="border-l-4 border-l-primary/20 hover:border-l-primary/40 transition-colors">
+                      <CardContent className="p-4">
+                        <div className="space-y-3">
+                          {/* Header with Action and Resource */}
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Badge className={getActionColor(log.action)} variant="outline">
+                              <span className="flex items-center gap-1 text-xs font-medium">
+                                {getActionIcon(log.action)}
+                                {log.action.toUpperCase()}
+                              </span>
+                            </Badge>
+                            <Badge variant="outline" className="text-xs bg-muted">
+                              {(log.resource || 'unknown').toUpperCase()}
+                            </Badge>
+                            <Badge variant="secondary" className="text-xs">
+                              {log.log_type === 'admin' ? 'Admin' : 'User'}
+                            </Badge>
+                          </div>
+
+                          {/* User/Admin Info */}
+                          <div className="space-y-1">
+                            <div className="font-semibold text-sm text-foreground">
+                              {log.log_type === 'admin' ? log.admin_name : log.user_name}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              {log.log_type === 'admin' ? log.admin_email : log.user_email}
+                            </div>
+                          </div>
+
+                          {/* Details */}
+                          <div className="bg-muted/30 p-3 rounded-lg">
+                            <div className="text-xs font-medium text-muted-foreground mb-1">Details:</div>
+                            <div className="text-sm break-words">{log.details}</div>
+                          </div>
+
+                          {/* Meta Information */}
+                          <div className="grid grid-cols-2 gap-3 text-xs">
+                            <div>
+                              <span className="text-muted-foreground">IP:</span>
+                              <div className="font-mono bg-muted px-2 py-1 rounded mt-1 break-all">
+                                {log.ip_address}
+                              </div>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">Date:</span>
+                              <div className="font-medium mt-1">
+                                {formatDate(log.created_at)}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Desktop Table Layout */}
+            <div className="hidden lg:block">
+              <div className="rounded-md border overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/50">
+                      <TableHead className="w-48 font-medium">User/Admin</TableHead>
+                      <TableHead className="w-24 font-medium">Action</TableHead>
+                      <TableHead className="w-24 font-medium">Resource</TableHead>
+                      <TableHead className="min-w-0 font-medium">Details</TableHead>
+                      <TableHead className="w-32 font-medium">IP Address</TableHead>
+                      <TableHead className="w-40 font-medium">Date</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {loading ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center py-12">
+                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                          <p className="text-muted-foreground">Loading activity logs...</p>
+                        </TableCell>
+                      </TableRow>
+                    ) : filteredLogs.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center py-12">
+                          <Activity className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                          <p className="text-muted-foreground">No activity logs found matching your criteria.</p>
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      filteredLogs.map((log) => (
+                        <TableRow key={log.id} className="hover:bg-muted/50">
+                          <TableCell className="py-3">
+                            <div className="space-y-1">
+                              <div className="font-medium text-sm">
+                                {log.log_type === 'admin' ? log.admin_name : log.user_name}
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                {log.log_type === 'admin' ? log.admin_email : log.user_email}
+                              </div>
+                              <Badge variant="secondary" className="text-xs">
+                                {log.log_type === 'admin' ? 'Admin' : 'User'}
+                              </Badge>
+                            </div>
+                          </TableCell>
+                          <TableCell className="py-3">
+                            <Badge className={getActionColor(log.action)} variant="outline">
+                              <span className="flex items-center gap-1 text-xs">
+                                {getActionIcon(log.action)}
+                                {log.action.toUpperCase()}
+                              </span>
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="py-3">
+                            <Badge variant="outline" className="text-xs bg-muted">
+                              {(log.resource || 'unknown').toUpperCase()}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="py-3 max-w-xs">
+                            <div className="text-sm" title={log.details}>
+                              {log.details}
+                            </div>
+                          </TableCell>
+                          <TableCell className="py-3">
+                            <code className="text-xs bg-muted px-2 py-1 rounded font-mono">
+                              {log.ip_address}
+                            </code>
+                          </TableCell>
+                          <TableCell className="py-3">
+                            <div className="text-sm text-muted-foreground">
+                              {formatDate(log.created_at)}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+
+            {/* Pagination - Mobile First */}
+            {totalPages > 1 && (
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t">
+                <div className="text-sm text-muted-foreground text-center sm:text-left">
+                  Page {currentPage} of {totalPages} • {totalLogs.toLocaleString()} total logs
+                </div>
+                <div className="flex gap-2">
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
                     disabled={currentPage === 1}
-                    className="flex-1 md:flex-none text-xs md:text-sm"
+                    className="px-4"
                   >
                     Previous
                   </Button>
@@ -506,16 +572,16 @@ export default function ActivityLogsPage() {
                     size="sm"
                     onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
                     disabled={currentPage === totalPages}
-                    className="flex-1 md:flex-none text-xs md:text-sm"
+                    className="px-4"
                   >
                     Next
                   </Button>
                 </div>
               </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   )
 }

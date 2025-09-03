@@ -57,10 +57,9 @@ CREATE TABLE IF NOT EXISTS last_visit_tracking (
 CREATE INDEX IF NOT EXISTS idx_visitor_tracking_user_month ON visitor_tracking(user_id, month);
 CREATE INDEX IF NOT EXISTS idx_last_visit_tracking_user_id ON last_visit_tracking(user_id);
 
--- Remove old API requests and custom domains fields from usage_tracking
--- (These features are being removed as per requirements)
+-- Remove old API requests field from usage_tracking
+-- (Custom domains feature was removed as per requirements)
 ALTER TABLE usage_tracking DROP COLUMN api_requests;
-ALTER TABLE usage_tracking DROP COLUMN custom_domains_used;
 
 -- Update subscription_plans to remove old features
 UPDATE subscription_plans SET 

@@ -1,26 +1,10 @@
 "use client"
 
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
-import { adminApi } from "@/lib/admin-api"
+import { adminAuthApi, type AdminUser } from "@/lib/admin-auth-api"
 import { useRouter, usePathname } from "next/navigation"
 
-interface AdminUser {
-  id: string
-  email: string
-  name: string
-  role: "super_admin" | "admin" | "moderator" | "analyst"
-  permissions: {
-    users: string[]
-    links: string[]
-    subscriptions: string[]
-    analytics: string[]
-    system: string[]
-    admins: string[]
-  }
-  isActive: boolean
-  lastLoginAt: string | null
-  createdAt: string
-}
+// AdminUser interface is now imported from admin-auth-api
 
 interface AdminAuthContextType {
   admin: AdminUser | null
@@ -51,7 +35,7 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
 
   const checkAuth = async () => {
     try {
-      const response = await adminApi.getMe()
+      const response = await adminAuthApi.getMe()
       setAdmin(response.adminUser)
 
       // If admin is authenticated and on login page, redirect to admin dashboard
@@ -75,7 +59,7 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (email: string, password: string) => {
     try {
-      const response = await adminApi.login({ email, password })
+      const response = await adminAuthApi.login({ email, password })
       setAdmin(response.adminUser)
       // Don't redirect here - let the calling component handle it
     } catch (error) {
@@ -85,13 +69,15 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
 
   const logout = async () => {
     try {
-      await adminApi.logout()
+      await adminAuthApi.logout()
     } catch (error) {
       // Even if logout fails on server, clear client state
       console.error("Admin logout error:", error)
     } finally {
       setAdmin(null)
       router.replace("/admin/login")
+      // Also clear the auth token from cookies
+      adminAuthApi.clearAuthToken()
     }
   }
 

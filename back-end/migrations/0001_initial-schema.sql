@@ -16,7 +16,6 @@ CREATE TABLE IF NOT EXISTS links (
   user_id TEXT NOT NULL,
   original_url TEXT NOT NULL,
   short_code TEXT UNIQUE NOT NULL,
-  custom_domain TEXT,
   title TEXT,
   description TEXT,
   is_active BOOLEAN DEFAULT true,
@@ -41,17 +40,6 @@ CREATE TABLE IF NOT EXISTS analytics_events (
   browser TEXT,
   os TEXT,
   FOREIGN KEY (link_id) REFERENCES links(id) ON DELETE CASCADE
-);
-
--- Custom domains table
-CREATE TABLE IF NOT EXISTS custom_domains (
-  id TEXT PRIMARY KEY,
-  user_id TEXT NOT NULL,
-  domain TEXT UNIQUE NOT NULL,
-  is_verified BOOLEAN DEFAULT false,
-  verification_token TEXT,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
 -- Create indexes for better performance

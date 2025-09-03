@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Eye, EyeOff, Shield } from "lucide-react"
-import { adminApi } from "@/lib/admin-api"
+import { adminAuthApi, handleAuthError } from "@/lib/admin-auth-api"
 
 export default function AdminLoginPage() {
   const [email, setEmail] = useState("")
@@ -26,10 +26,10 @@ export default function AdminLoginPage() {
     setError("")
 
     try {
-      await adminApi.login({ email, password })
+      await adminAuthApi.login({ email, password })
       router.push("/admin")
     } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred")
+      setError(handleAuthError(err))
     } finally {
       setIsLoading(false)
     }

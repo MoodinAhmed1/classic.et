@@ -6,7 +6,18 @@ import { cors } from 'hono/cors';
 import { jwt, sign, verify } from 'hono/jwt';
 import { setCookie, getCookie } from 'hono/cookie';
 import { UAParser } from 'ua-parser-js';
-import { adminAuthMiddleware, requirePermission, getAdminByEmail, updateAdminLastLogin, verifyAdminPassword, hashAdminPasswordPBKDF2, generateId, logAdminActivity, logUserActivity } from './admin-auth';
+import { adminAuthMiddleware, requirePermission, getAdminByEmail, updateAdminLastLogin, verifyAdminPassword, hashAdminPassword, generateId, logAdminActivity, logUserActivity } from './admin-auth-new';
+import { 
+  getAllAdminUsers, 
+  createAdminUser, 
+  updateAdminUser, 
+  deleteAdminUser, 
+  toggleAdminStatus,
+  changeAdminPassword,
+  ROLE_PERMISSIONS,
+  canManageAdmins,
+  canDeleteAdmins
+} from './admin-management';
 import { 
   checkUsageLimit, 
   incrementUsage, 
@@ -2240,19 +2251,7 @@ app.get('/api/admin/test-db', async (c) => {
 // Admin: list admin users
 app.get('/api/admin/users', adminAuthMiddleware as any, requirePermission('admins', 'read') as any, async (c) => {
   try {
-    const rows = await (c.env.DB as any)
-      .prepare('SELECT id, email, name, role, permissions, is_active, last_login_at, created_at FROM admin_users ORDER BY created_at DESC')
-      .all();
-    const adminUsers = (rows?.results || []).map((u: any) => ({
-      id: u.id,
-      email: u.email,
-      name: u.name,
-      role: u.role,
-      permissions: (() => { try { return JSON.parse(u.permissions || '{}') } catch { return {} } })(),
-      is_active: !!u.is_active,
-      last_login_at: u.last_login_at,
-      created_at: u.created_at,
-    }));
+    const adminUsers = await getAllAdminUsers(c.env);
     return c.json({ adminUsers });
   } catch (e) {
     console.error('Admin list error:', e);
@@ -2265,86 +2264,19 @@ app.post('/api/admin/users', adminAuthMiddleware as any, requirePermission('admi
   try {
     const body = await c.req.json();
     const { email, name, password, role, permissions } = body || {};
+    
     if (!email || !name || !password || !role) {
       return c.json({ error: 'Missing required fields' }, 400);
     }
     
-    // Check if email already exists
-    const existingAdmin = await (c.env.DB as any)
-      .prepare('SELECT id FROM admin_users WHERE email = ?')
-      .bind(email)
-      .first();
-    
-    if (existingAdmin) {
-      return c.json({ error: 'Admin with this email already exists' }, 400);
-    }
-    
-    const id = generateId();
-    const permsJson = JSON.stringify(permissions || {});
-    // Use admin-specific password hashing
-    const pwdHash = await hashAdminPasswordPBKDF2(password);
-    const now = new Date().toISOString();
     const currentAdmin = c.get('adminUser') as any;
+    const adminUser = await createAdminUser(c.env, { email, name, password, role, permissions }, currentAdmin.id);
     
-    console.log('Creating admin with data:', { id, email, name, role, permissions: permsJson, currentAdminId: currentAdmin.id });
-    console.log('Password hash length:', pwdHash.length);
-    console.log('Current admin object:', currentAdmin);
-    
-    // First check if the table exists
-    try {
-      const tableCheck = await (c.env.DB as any)
-        .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='admin_users'")
-        .first();
-      
-      if (!tableCheck) {
-        console.error('Admin users table does not exist');
-        return c.json({ error: 'Admin system not initialized. Please run migrations first.' }, 500);
-      }
-    } catch (tableError: any) {
-      console.error('Table check error:', tableError);
-      return c.json({ error: 'Database schema check failed', details: tableError.message }, 500);
-    }
-    
-    try {
-      console.log('About to execute SQL with params:', { id, email, name, role, permsJson, now, createdBy: currentAdmin.id || null });
-      const result = await (c.env.DB as any)
-        .prepare('INSERT INTO admin_users (id, email, name, password_hash, role, permissions, is_active, created_at, updated_at, created_by) VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?)')
-        .bind(id, email, name, pwdHash, role, permsJson, now, now, currentAdmin.id || null)
-        .run();
-      
-      console.log('Admin user created successfully, result:', result);
-    } catch (dbError: any) {
-      console.error('Database error:', dbError);
-      console.error('SQL error details:', {
-        message: dbError.message,
-        code: dbError.code,
-        stack: dbError.stack
-      });
-      throw dbError;
-    }
-    
-    // Log the activity
-    const adminUser = c.get('adminUser') as any;
-    try {
-      await logAdminActivity(c.env.DB, adminUser.id, 'admin_created', 'admin_user', id, { email, name, role }, c.req.header('CF-Connecting-IP'), c.req.header('User-Agent'));
-      console.log('Activity logged successfully');
-    } catch (logError) {
-      console.error('Activity logging error:', logError);
-      // Don't fail the entire operation if logging fails
-    }
-    
-    return c.json({ adminUser: { id, email, name, role, permissions: permissions || {}, is_active: true, created_at: now } });
+    return c.json({ adminUser });
   } catch (e) {
     console.error('Create admin error:', e);
     const errorMessage = e instanceof Error ? e.message : 'Unknown error';
-    const errorStack = e instanceof Error ? e.stack : undefined;
-    const errorName = e instanceof Error ? e.name : 'Unknown';
-    console.error('Error details:', {
-      message: errorMessage,
-      stack: errorStack,
-      name: errorName
-    });
-    return c.json({ error: 'Internal server error', details: errorMessage }, 500);
+    return c.json({ error: errorMessage }, 400);
   }
 });
 
@@ -2361,47 +2293,23 @@ app.put('/api/admin/users/:id', adminAuthMiddleware as any, requirePermission('a
       return c.json({ error: 'Cannot change your own role' }, 400);
     }
     
-    const fields: string[] = [];
-    const params: any[] = [];
-    if (name !== undefined) { fields.push('name = ?'); params.push(name); }
-    if (role !== undefined) { fields.push('role = ?'); params.push(role); }
-    if (permissions !== undefined) { fields.push('permissions = ?'); params.push(JSON.stringify(permissions)); }
-    if (isActive !== undefined) { fields.push('is_active = ?'); params.push(!!isActive ? 1 : 0); }
-    fields.push('updated_at = ?'); params.push(new Date().toISOString());
-    params.push(id);
+    const updateData: any = {};
+    if (name !== undefined) updateData.name = name;
+    if (role !== undefined) updateData.role = role;
+    if (permissions !== undefined) updateData.permissions = permissions;
+    if (isActive !== undefined) updateData.is_active = isActive;
     
-    if (fields.length === 1) { // Only updated_at
+    if (Object.keys(updateData).length === 0) {
       return c.json({ error: 'No fields to update' }, 400);
     }
     
-    await (c.env.DB as any)
-      .prepare(`UPDATE admin_users SET ${fields.join(', ')} WHERE id = ?`)
-      .bind(...params)
-      .run();
-    
-    const row = await (c.env.DB as any)
-      .prepare('SELECT id, email, name, role, permissions, is_active, last_login_at, created_at FROM admin_users WHERE id = ?')
-      .bind(id)
-      .first();
-    
-    const adminUser = row ? {
-      id: (row as any).id,
-      email: (row as any).email,
-      name: (row as any).name,
-      role: (row as any).role,
-      permissions: (()=>{ try { return JSON.parse((row as any).permissions||'{}') } catch { return {} } })(),
-      is_active: !!(row as any).is_active,
-      last_login_at: (row as any).last_login_at,
-      created_at: (row as any).created_at,
-    } : null;
-    
-    // Log the activity
-    await logAdminActivity(c.env.DB, currentAdmin.id, 'admin_updated', 'admin_user', id, { name, role, permissions, isActive }, c.req.header('CF-Connecting-IP'), c.req.header('User-Agent'));
+    const adminUser = await updateAdminUser(c.env, id, updateData, currentAdmin.id);
     
     return c.json({ adminUser });
   } catch (e) {
     console.error('Update admin error:', e);
-    return c.json({ error: 'Internal server error' }, 500);
+    const errorMessage = e instanceof Error ? e.message : 'Unknown error';
+    return c.json({ error: errorMessage }, 400);
   }
 });
 
@@ -2411,31 +2319,13 @@ app.delete('/api/admin/users/:id', adminAuthMiddleware as any, requirePermission
     const id = c.req.param('id');
     const currentAdmin = c.get('adminUser') as any;
     
-    // Prevent deleting yourself
-    if (id === currentAdmin.id) {
-      return c.json({ error: 'Cannot delete your own account' }, 400);
-    }
-    
-    // Check if admin exists
-    const existingAdmin = await (c.env.DB as any)
-      .prepare('SELECT id, email, name FROM admin_users WHERE id = ?')
-      .bind(id)
-      .first();
-    
-    if (!existingAdmin) {
-      return c.json({ error: 'Admin not found' }, 400);
-    }
-    
-    // Delete the admin
-    await (c.env.DB as any).prepare('DELETE FROM admin_users WHERE id = ?').bind(id).run();
-    
-    // Log the activity
-    await logAdminActivity(c.env.DB, currentAdmin.id, 'admin_deleted', 'admin_user', id, { email: existingAdmin.email, name: existingAdmin.name }, c.req.header('CF-Connecting-IP'), c.req.header('User-Agent'));
+    await deleteAdminUser(c.env, id, currentAdmin.id);
     
     return c.json({ success: true });
   } catch (e) {
     console.error('Delete admin error:', e);
-    return c.json({ error: 'Internal server error' }, 500);
+    const errorMessage = e instanceof Error ? e.message : 'Unknown error';
+    return c.json({ error: errorMessage }, 400);
   }
 });
 
@@ -2445,40 +2335,35 @@ app.patch('/api/admin/users/:id/toggle-status', adminAuthMiddleware as any, requ
     const id = c.req.param('id');
     const currentAdmin = c.get('adminUser') as any;
     
-    // Prevent deactivating yourself
-    if (id === currentAdmin.id) {
-      return c.json({ error: 'Cannot deactivate your own account' }, 400);
-    }
+    const result = await toggleAdminStatus(c.env, id, currentAdmin.id);
     
-    // Check if admin exists and get current status
-    const existingAdmin = await (c.env.DB as any)
-      .prepare('SELECT id, email, name, is_active FROM admin_users WHERE id = ?')
-      .bind(id)
-      .first();
-    
-    if (!existingAdmin) {
-      return c.json({ error: 'Admin not found' }, 400);
-    }
-    
-    // Toggle the status
-    const newStatus = !existingAdmin.is_active;
-    await (c.env.DB as any)
-      .prepare('UPDATE admin_users SET is_active = ?, updated_at = ? WHERE id = ?')
-      .bind(newStatus ? 1 : 0, new Date().toISOString(), id)
-      .run();
-    
-    // Log the activity
-    await logAdminActivity(c.env.DB, currentAdmin.id, 'admin_status_toggled', 'admin_user', id, { 
-      email: existingAdmin.email, 
-      name: existingAdmin.name, 
-      previousStatus: existingAdmin.is_active, 
-      newStatus 
-    }, c.req.header('CF-Connecting-IP'), c.req.header('User-Agent'));
-    
-    return c.json({ success: true, isActive: newStatus });
+    return c.json({ success: true, isActive: result.is_active });
   } catch (e) {
     console.error('Toggle admin status error:', e);
-    return c.json({ error: 'Internal server error' }, 500);
+    const errorMessage = e instanceof Error ? e.message : 'Unknown error';
+    return c.json({ error: errorMessage }, 400);
+  }
+});
+
+// Admin: change admin password
+app.patch('/api/admin/users/:id/change-password', adminAuthMiddleware as any, requirePermission('admins', 'write') as any, async (c) => {
+  try {
+    const id = c.req.param('id');
+    const body = await c.req.json();
+    const { password } = body || {};
+    
+    if (!password) {
+      return c.json({ error: 'Password is required' }, 400);
+    }
+    
+    const currentAdmin = c.get('adminUser') as any;
+    await changeAdminPassword(c.env, id, password, currentAdmin.id);
+    
+    return c.json({ success: true });
+  } catch (e) {
+    console.error('Change admin password error:', e);
+    const errorMessage = e instanceof Error ? e.message : 'Unknown error';
+    return c.json({ error: errorMessage }, 400);
   }
 });
 
@@ -3397,6 +3282,22 @@ app.get('/api/links', authMiddleware, async (c) => {
       LIMIT ? OFFSET ?
     `).bind(payload.userId, limit, offset).all();
 
+    // Log user activity for viewing links
+    try {
+      await logUserActivity(
+        c.env.DB,
+        payload.userId,
+        'links_viewed',
+        'link',
+        undefined,
+        { count: links.results.length, action: 'viewed_links_list' },
+        c.req.header('CF-Connecting-IP'),
+        c.req.header('User-Agent')
+      );
+    } catch (logError) {
+      console.error('Activity logging error for viewing links:', logError);
+    }
+
     return c.json({
       links: links.results.map((link: any) => ({
         id: link.id,
@@ -3427,6 +3328,22 @@ app.get('/api/links/:id', authMiddleware, async (c) => {
 
     if (!link) {
       return c.json({ error: 'Link not found' }, 404);
+    }
+
+    // Log user activity for viewing specific link
+    try {
+      await logUserActivity(
+        c.env.DB,
+        payload.userId,
+        'link_viewed',
+        'link',
+        linkId,
+        { shortCode: link.short_code, title: link.title, action: 'viewed_specific_link' },
+        c.req.header('CF-Connecting-IP'),
+        c.req.header('User-Agent')
+      );
+    } catch (logError) {
+      console.error('Activity logging error for viewing link:', logError);
     }
 
     return c.json({
@@ -3746,6 +3663,22 @@ app.get('/:shortCode', async (c) => {
       'UPDATE links SET click_count = click_count + 1 WHERE id = ?'
     ).bind(link.id).run();
 
+    // Log user activity for link click
+    try {
+      await logUserActivity(
+        c.env.DB,
+        link.user_id,
+        'link_clicked',
+        'link',
+        link.id,
+        { shortCode: link.short_code, title: link.title, originalUrl: link.original_url },
+        c.req.header('CF-Connecting-IP'),
+        c.req.header('User-Agent')
+      );
+    } catch (logError) {
+      console.error('Activity logging error for link click:', logError);
+    }
+
     // Track new visitor for the link owner
     await trackNewVisitor(c.env.DB, link.user_id);
 
@@ -3948,6 +3881,22 @@ app.get('/api/subscription/usage', authMiddleware, async (c) => {
     const payload = c.get('jwtPayload');
     const usageSummary = await getUserUsageSummary(c.env.DB, payload.userId);
     
+    // Log user activity for viewing usage
+    try {
+      await logUserActivity(
+        c.env.DB,
+        payload.userId,
+        'usage_viewed',
+        'subscription',
+        undefined,
+        { action: 'viewed_usage_summary', plan: usageSummary.plan.tier },
+        c.req.header('CF-Connecting-IP'),
+        c.req.header('User-Agent')
+      );
+    } catch (logError) {
+      console.error('Activity logging error for viewing usage:', logError);
+    }
+    
     return c.json(usageSummary);
   } catch (error) {
     console.error('Get usage error:', error);
@@ -3967,6 +3916,22 @@ app.get('/api/subscription/current', authMiddleware, async (c) => {
     `).bind(payload.userId).first() as any;
 
     const plan = await getSubscriptionPlan(c.env.DB, user.tier);
+    
+    // Log user activity for viewing subscription
+    try {
+      await logUserActivity(
+        c.env.DB,
+        payload.userId,
+        'subscription_viewed',
+        'subscription',
+        undefined,
+        { tier: user.tier, status: user.subscription_status, action: 'viewed_subscription_info' },
+        c.req.header('CF-Connecting-IP'),
+        c.req.header('User-Agent')
+      );
+    } catch (logError) {
+      console.error('Activity logging error for viewing subscription:', logError);
+    }
     
     return c.json({
       user: {
@@ -4427,6 +4392,22 @@ app.get('/api/subscription/history', authMiddleware, async (c) => {
       planName: row.plan_name,
       planTier: row.plan_tier,
     }));
+
+    // Log user activity for viewing subscription history
+    try {
+      await logUserActivity(
+        c.env.DB,
+        payload.userId,
+        'subscription_history_viewed',
+        'subscription',
+        undefined,
+        { action: 'viewed_subscription_history', count: history.length },
+        c.req.header('CF-Connecting-IP'),
+        c.req.header('User-Agent')
+      );
+    } catch (logError) {
+      console.error('Activity logging error for viewing subscription history:', logError);
+    }
 
     return c.json({ history });
   } catch (error) {
@@ -4930,6 +4911,232 @@ app.get('/api/admin/user-activity-logs', adminAuthMiddleware as any, async (c) =
   } catch (e) {
     console.error('Get user activity logs error:', e);
     return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+// Admin: Get system settings
+app.get('/api/admin/settings/system', adminAuthMiddleware as any, requirePermission('system', 'read') as any, async (c) => {
+  try {
+    const result = await (c.env.DB as any)
+      .prepare(`
+        SELECT setting_key, setting_value, setting_type, description
+        FROM system_settings
+        ORDER BY setting_key
+      `)
+      .all();
+
+    const settings: Record<string, any> = {};
+    
+    (result?.results || []).forEach((row: any) => {
+      let value: any = row.setting_value;
+      
+      // Convert value based on type
+      switch (row.setting_type) {
+        case 'number':
+          value = Number(value);
+          break;
+        case 'boolean':
+          value = value === 'true';
+          break;
+        default:
+          // string type - keep as is
+          break;
+      }
+      
+      settings[row.setting_key] = value;
+    });
+
+    return c.json({ settings });
+  } catch (e) {
+    console.error('Get system settings error:', e);
+    return c.json({ error: 'Failed to load system settings' }, 500);
+  }
+});
+
+// Admin: Update system settings
+app.put('/api/admin/settings/system', adminAuthMiddleware as any, requirePermission('system', 'write') as any, async (c) => {
+  try {
+    const body = await c.req.json();
+    const { settings } = body || {};
+    
+    if (!settings || typeof settings !== 'object') {
+      return c.json({ error: 'Invalid settings data' }, 400);
+    }
+
+    const currentAdmin = c.get('adminUser') as any;
+    const now = new Date().toISOString();
+
+    // Update each setting
+    for (const [key, value] of Object.entries(settings)) {
+      const settingType = typeof value === 'boolean' ? 'boolean' : 
+                         typeof value === 'number' ? 'number' : 'string';
+      
+      await (c.env.DB as any)
+        .prepare(`
+          UPDATE system_settings 
+          SET setting_value = ?, setting_type = ?, updated_at = ?
+          WHERE setting_key = ?
+        `)
+        .bind(String(value), settingType, now, key)
+        .run();
+    }
+
+    // Log the activity
+    await logAdminActivity(
+      c.env.DB,
+      currentAdmin.id,
+      'settings_updated',
+      'system',
+      undefined,
+      { updated_keys: Object.keys(settings) },
+      c.req.header('CF-Connecting-IP'),
+      c.req.header('User-Agent')
+    );
+
+    return c.json({ success: true });
+  } catch (e) {
+    console.error('Update system settings error:', e);
+    return c.json({ error: 'Failed to update system settings' }, 500);
+  }
+});
+
+// Admin: Get individual setting
+app.get('/api/admin/settings/:key', adminAuthMiddleware as any, requirePermission('system', 'read') as any, async (c) => {
+  try {
+    const key = c.req.param('key');
+    
+    const result = await (c.env.DB as any)
+      .prepare(`
+        SELECT setting_key, setting_value, setting_type, description
+        FROM system_settings
+        WHERE setting_key = ?
+      `)
+      .bind(key)
+      .first();
+
+    if (!result) {
+      return c.json({ error: 'Setting not found' }, 404);
+    }
+
+    let value: any = result.setting_value;
+    
+    // Convert value based on type
+    switch (result.setting_type) {
+      case 'number':
+        value = Number(value);
+        break;
+      case 'boolean':
+        value = value === 'true';
+        break;
+      default:
+        // string type - keep as is
+        break;
+    }
+
+    return c.json({ 
+      setting: {
+        key: result.setting_key,
+        value,
+        type: result.setting_type,
+        description: result.description
+      }
+    });
+  } catch (e) {
+    console.error('Get setting error:', e);
+    return c.json({ error: 'Failed to load setting' }, 500);
+  }
+});
+
+// Admin: Update individual setting
+app.put('/api/admin/settings/:key', adminAuthMiddleware as any, requirePermission('system', 'write') as any, async (c) => {
+  try {
+    const key = c.req.param('key');
+    const body = await c.req.json();
+    const { value } = body || {};
+    
+    if (value === undefined) {
+      return c.json({ error: 'Value is required' }, 400);
+    }
+
+    const currentAdmin = c.get('adminUser') as any;
+    const settingType = typeof value === 'boolean' ? 'boolean' : 
+                       typeof value === 'number' ? 'number' : 'string';
+    const now = new Date().toISOString();
+
+    await (c.env.DB as any)
+      .prepare(`
+        UPDATE system_settings 
+        SET setting_value = ?, setting_type = ?, updated_at = ?
+        WHERE setting_key = ?
+      `)
+      .bind(String(value), settingType, now, key)
+      .run();
+
+    // Log the activity
+    await logAdminActivity(
+      c.env.DB,
+      currentAdmin.id,
+      'setting_updated',
+      'system',
+      undefined,
+      { key, value },
+      c.req.header('CF-Connecting-IP'),
+      c.req.header('User-Agent')
+    );
+
+    return c.json({ 
+      setting: {
+        key,
+        value,
+        type: settingType
+      }
+    });
+  } catch (e) {
+    console.error('Update setting error:', e);
+    return c.json({ error: 'Failed to update setting' }, 500);
+  }
+});
+
+// Admin: Get all settings (for settings list)
+app.get('/api/admin/settings', adminAuthMiddleware as any, requirePermission('system', 'read') as any, async (c) => {
+  try {
+    const result = await (c.env.DB as any)
+      .prepare(`
+        SELECT setting_key, setting_value, setting_type, description, updated_at
+        FROM system_settings
+        ORDER BY setting_key
+      `)
+      .all();
+
+    const settings = (result?.results || []).map((row: any) => {
+      let value: any = row.setting_value;
+      
+      // Convert value based on type
+      switch (row.setting_type) {
+        case 'number':
+          value = Number(value);
+          break;
+        case 'boolean':
+          value = value === 'true';
+          break;
+        default:
+          // string type - keep as is
+          break;
+      }
+      
+      return {
+        key: row.setting_key,
+        value,
+        type: row.setting_type,
+        description: row.description,
+        updated_at: row.updated_at
+      };
+    });
+
+    return c.json({ settings });
+  } catch (e) {
+    console.error('Get settings error:', e);
+    return c.json({ error: 'Failed to load settings' }, 500);
   }
 });
 

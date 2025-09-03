@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { adminApi } from "@/lib/admin-api"
+import { adminAuthApi } from "@/lib/admin-auth-api"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -35,7 +35,7 @@ export function AdminHeader() {
 
   const fetchAdminUser = async () => {
     try {
-      const response = await adminApi.getMe()
+      const response = await adminAuthApi.getMe()
       setAdmin(response.adminUser)
     } catch (error) {
       console.error("Failed to fetch admin user:", error)
@@ -47,7 +47,7 @@ export function AdminHeader() {
 
   const handleLogout = async () => {
     try {
-      await adminApi.logout()
+      await adminAuthApi.logout()
       router.push("/admin/login")
     } catch (error) {
       console.error("Logout error:", error)

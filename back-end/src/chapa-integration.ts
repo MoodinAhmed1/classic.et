@@ -5,6 +5,8 @@
  * It handles payment initialization, verification, and webhook processing.
  */
 
+import { generateId } from './admin-auth-new';
+
 // ============================================================================
 // TYPES & INTERFACES
 // ============================================================================
@@ -246,6 +248,32 @@ export class ChapaWebhookHandler {
         new Date(Date.now() + (transaction.billing_cycle === 'yearly' ? 365 : 30) * 24 * 60 * 60 * 1000).toISOString(),
         transaction.user_id
       ).run();
+
+      // Log user activity for subscription upgrade
+      try {
+                 await this.db.prepare(`
+           INSERT INTO user_activity_logs (
+             id, user_id, action, resource_type, resource_id, details, ip_address, user_agent, created_at
+           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+         `).bind(
+           generateId(),
+           transaction.user_id,
+           'subscription_upgraded',
+           'subscription',
+           transaction.plan_id,
+           JSON.stringify({ 
+             old_tier: 'free', 
+             new_tier: newTier, 
+             plan_id: transaction.plan_id,
+             billing_cycle: transaction.billing_cycle,
+             tx_ref: txRef
+           }),
+           null, // IP address not available in webhook
+           'Chapa Webhook'
+         ).run();
+      } catch (logError) {
+        console.error('Error logging user activity for subscription upgrade:', logError);
+      }
 
       console.log(`Payment success processed. User ${transaction.user_id} upgraded to ${newTier}.`);
     } catch (error) {
