@@ -55,8 +55,6 @@
   }
   body {
     @apply bg-background text-foreground;
-    /* Ensure no horizontal scroll on mobile */
-    overflow-x: hidden;
   }
   
   /* Responsive typography */

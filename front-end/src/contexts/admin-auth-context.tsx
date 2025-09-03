@@ -38,10 +38,8 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
       const response = await adminAuthApi.getMe()
       setAdmin(response.adminUser)
 
-      // If admin is authenticated and on login page, redirect to admin dashboard
-      if (response.adminUser && pathname === "/admin/login") {
-        router.replace("/admin")
-      }
+      // If admin is authenticated and on login page, do not auto-redirect
+      // Let the login page handle navigation after explicit login
     } catch (error) {
       // Admin not authenticated
       setAdmin(null)

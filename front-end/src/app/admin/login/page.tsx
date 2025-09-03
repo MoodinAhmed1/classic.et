@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -26,6 +26,8 @@ export default function AdminLoginPage() {
     setError("")
 
     try {
+      // Ensure any existing admin session is cleared before logging in
+      try { await adminAuthApi.logout() } catch {}
       await adminAuthApi.login({ email, password })
       router.push("/admin")
     } catch (err) {

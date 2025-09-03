@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { adminApi } from "@/lib/admin-api"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -20,6 +20,9 @@ import {
   Calendar,
   Users,
   UserCheck,
+  Filter,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react"
 
 interface ActivityLog {
@@ -53,6 +56,7 @@ export default function ActivityLogsPage() {
   const [totalLogs, setTotalLogs] = useState(0)
   const [adminLogsCount, setAdminLogsCount] = useState(0)
   const [userLogsCount, setUserLogsCount] = useState(0)
+  const [showFilters, setShowFilters] = useState(false)
 
   useEffect(() => {
     fetchLogs()
@@ -74,9 +78,7 @@ export default function ActivityLogsPage() {
             offset: (currentPage - 1) * 50,
             action: actionFilter !== "all" ? actionFilter : undefined,
           }
-          console.log('Fetching admin activity logs with params:', adminParams)
           const adminResponse = await adminApi.getActivityLogs(adminParams)
-          console.log('Admin activity logs response:', adminResponse)
           
           if (adminResponse.logs && Array.isArray(adminResponse.logs)) {
             const adminLogs = adminResponse.logs.map((log: any) => ({
@@ -88,9 +90,6 @@ export default function ActivityLogsPage() {
             allLogs = [...allLogs, ...adminLogs]
             totalCount += adminResponse.total || adminLogs.length
             adminCount = adminResponse.total || adminLogs.length
-            console.log('Admin logs processed:', adminLogs.length)
-          } else {
-            console.log('No admin logs found or invalid response format')
           }
         } catch (error) {
           console.error('Failed to fetch admin logs:', error)
@@ -106,15 +105,13 @@ export default function ActivityLogsPage() {
             action: actionFilter !== "all" ? actionFilter : undefined,
             resourceType: resourceFilter !== "all" ? resourceFilter : undefined,
           }
-          console.log('Fetching user activity logs with params:', userParams)
           const userResponse = await adminApi.getUserActivityLogs(userParams)
-          console.log('User activity logs response:', userResponse)
           
           if (userResponse.logs && Array.isArray(userResponse.logs)) {
             const userLogs = userResponse.logs.map((log: any) => ({
               ...log,
               log_type: 'user' as const,
-              resource: log.resource_type || 'unknown', // Map resource_type to resource for consistency
+              resource: log.resource_type || 'unknown',
               resource_type: log.resource_type || 'unknown',
               admin_user_id: undefined,
               admin_name: undefined,
@@ -123,10 +120,6 @@ export default function ActivityLogsPage() {
             allLogs = [...allLogs, ...userLogs]
             totalCount += userResponse.total || userLogs.length
             userCount = userResponse.total || userLogs.length
-            console.log('User logs processed:', userLogs.length)
-          } else {
-            console.log('No user logs found or invalid response format')
-            console.log('User response structure:', userResponse)
           }
         } catch (error) {
           console.error('Failed to fetch user logs:', error)
@@ -135,11 +128,6 @@ export default function ActivityLogsPage() {
 
       // Sort by created_at descending
       allLogs.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-
-      console.log('Final combined logs:', allLogs)
-      console.log('Total count:', totalCount)
-      console.log('Admin count:', adminCount)
-      console.log('User count:', userCount)
 
       setLogs(allLogs)
       setTotalLogs(totalCount)
@@ -247,118 +235,164 @@ export default function ActivityLogsPage() {
   const uniqueActions = Array.from(new Set(logs.map((log) => log.action)))
   const uniqueResources = Array.from(new Set(logs.map((log) => log.resource).filter(Boolean)))
 
-  return (
-    <div className="min-h-screen bg-background">
-      <div className="container mx-auto px-4 py-6 space-y-6">
-        {/* Header */}
-        <div className="text-center sm:text-left">
-          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-foreground">Activity Logs</h1>
-          <p className="text-sm sm:text-base text-muted-foreground mt-2">
-            Monitor system activity and user actions across the platform
-          </p>
+  if (loading) {
+    return (
+      <div className="container space-y-4 sm:space-y-6">
+        <div>
+          <h2 className="text-2xl sm:text-3xl font-bold text-foreground">Activity Logs</h2>
+          <p className="text-sm sm:text-base text-muted-foreground">Monitor system activity and user actions</p>
         </div>
 
-        {/* Stats Cards - Mobile First Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950 dark:to-blue-900">
-            <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-medium text-blue-900 dark:text-blue-100">Total Logs</CardTitle>
-                <Activity className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-blue-900 dark:text-blue-100">{totalLogs.toLocaleString()}</div>
-              <p className="text-xs text-blue-700 dark:text-blue-300">All activity records</p>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-950 dark:to-green-900">
-            <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-medium text-green-900 dark:text-green-100">Admin Logs</CardTitle>
-                <UserCheck className="h-5 w-5 text-green-600 dark:text-green-400" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-900 dark:text-green-100">{adminLogsCount.toLocaleString()}</div>
-              <p className="text-xs text-green-700 dark:text-green-300">Administrative actions</p>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-950 dark:to-purple-900">
-            <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-medium text-purple-900 dark:text-purple-100">User Logs</CardTitle>
-                <Users className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-purple-900 dark:text-purple-100">{userLogsCount.toLocaleString()}</div>
-              <p className="text-xs text-purple-700 dark:text-purple-300">User activities</p>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-950 dark:to-orange-900">
-            <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-medium text-orange-900 dark:text-orange-100">Today</CardTitle>
-                <Calendar className="h-5 w-5 text-orange-600 dark:text-orange-400" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-orange-900 dark:text-orange-100">
-                {logs.filter((log) => {
-                  const today = new Date().toDateString()
-                  return new Date(log.created_at).toDateString() === today
-                }).length}
-              </div>
-              <p className="text-xs text-orange-700 dark:text-orange-300">Actions today</p>
-            </CardContent>
-          </Card>
+        {/* Loading Stats Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+          {[...Array(4)].map((_, i) => (
+            <Card key={i}>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <div className="h-3 w-16 sm:h-4 sm:w-20 bg-muted animate-pulse rounded" />
+                <div className="h-3 w-3 sm:h-4 sm:w-4 bg-muted animate-pulse rounded" />
+              </CardHeader>
+              <CardContent>
+                <div className="h-6 w-12 sm:h-8 sm:w-16 bg-muted animate-pulse rounded mb-2" />
+                <div className="h-2 w-20 sm:h-3 sm:w-24 bg-muted animate-pulse rounded" />
+              </CardContent>
+            </Card>
+          ))}
         </div>
 
-        {/* Filters and Search - Mobile First */}
+        {/* Loading Content */}
         <Card>
-          <CardHeader className="pb-4">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <div>
-                <CardTitle className="text-lg sm:text-xl">Activity Logs</CardTitle>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Showing {filteredLogs.length} of {totalLogs} logs
-                </p>
-              </div>
-              <div className="flex flex-col sm:flex-row gap-2">
-                <Button onClick={fetchLogs} variant="outline" className="w-full sm:w-auto">
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                  <span className="hidden sm:inline">Refresh</span>
-                  <span className="sm:hidden">Sync</span>
-                </Button>
-                <Button onClick={handleExport} className="w-full sm:w-auto">
-                  <Download className="h-4 w-4 mr-2" />
-                  <span className="hidden sm:inline">Export CSV</span>
-                  <span className="sm:hidden">Export</span>
-                </Button>
-              </div>
-            </div>
+          <CardHeader>
+            <div className="h-4 w-32 sm:w-40 bg-muted animate-pulse rounded" />
+            <div className="h-3 w-48 sm:w-56 bg-muted animate-pulse rounded" />
           </CardHeader>
-          
           <CardContent className="space-y-4">
-            {/* Search Bar */}
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search logs by user, action, resource, or details..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 w-full"
-              />
-            </div>
+            <div className="h-10 w-full bg-muted animate-pulse rounded" />
+            <div className="h-10 w-full bg-muted animate-pulse rounded" />
+            <div className="h-10 w-full bg-muted animate-pulse rounded" />
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
 
-            {/* Filters - Mobile First Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+  return (
+    <div className="container space-y-4 sm:space-y-6">
+      {/* Header */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="text-2xl sm:text-3xl font-bold text-foreground">Activity Logs</h2>
+          <p className="text-sm sm:text-base text-muted-foreground">Monitor system activity and user actions across the platform</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-xs sm:text-sm text-muted-foreground">Total Logs:</span>
+          <Badge variant="outline" className="text-xs sm:text-sm">{totalLogs.toLocaleString()}</Badge>
+        </div>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-xs sm:text-sm font-medium">Total Logs</CardTitle>
+            <Activity className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-lg sm:text-2xl font-bold">{totalLogs.toLocaleString()}</div>
+            <p className="text-xs text-muted-foreground">All activity records</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-xs sm:text-sm font-medium">Admin Logs</CardTitle>
+            <UserCheck className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-lg sm:text-2xl font-bold">{adminLogsCount.toLocaleString()}</div>
+            <p className="text-xs text-muted-foreground">Administrative actions</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-xs sm:text-sm font-medium">User Logs</CardTitle>
+            <Users className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-lg sm:text-2xl font-bold">{userLogsCount.toLocaleString()}</div>
+            <p className="text-xs text-muted-foreground">User activities</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-xs sm:text-sm font-medium">Today</CardTitle>
+            <Calendar className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-lg sm:text-2xl font-bold">
+              {logs.filter((log) => {
+                const today = new Date().toDateString()
+                return new Date(log.created_at).toDateString() === today
+              }).length}
+            </div>
+            <p className="text-xs text-muted-foreground">Actions today</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Main Content */}
+      <Card>
+        <CardHeader>
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <CardTitle className="text-lg sm:text-xl">Activity Logs</CardTitle>
+              <CardDescription className="text-sm">
+                Showing {filteredLogs.length} of {totalLogs} logs
+              </CardDescription>
+            </div>
+            <div className="flex flex-col gap-2 sm:flex-row sm:gap-3">
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => setShowFilters(!showFilters)}
+                className="w-full sm:w-auto"
+              >
+                <Filter className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
+                Filters
+                {showFilters ? <ChevronUp className="h-3 w-3 sm:h-4 sm:w-4 ml-2" /> : <ChevronDown className="h-3 w-3 sm:h-4 sm:w-4 ml-2" />}
+              </Button>
+              <Button onClick={fetchLogs} variant="outline" size="sm" className="w-full sm:w-auto">
+                <RefreshCw className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
+                <span className="hidden sm:inline">Refresh</span>
+                <span className="sm:hidden">Sync</span>
+              </Button>
+              <Button onClick={handleExport} size="sm" className="w-full sm:w-auto">
+                <Download className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
+                <span className="hidden sm:inline">Export CSV</span>
+                <span className="sm:hidden">Export</span>
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+        
+        <CardContent className="space-y-4 px-2 sm:px-6">
+          {/* Search Bar */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search logs by user, action, resource, or details..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10 w-full text-sm"
+            />
+          </div>
+
+          {/* Filters - Collapsible */}
+          {showFilters && (
+            <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
               <Select value={logTypeFilter} onValueChange={setLogTypeFilter}>
-                <SelectTrigger className="w-full">
+                <SelectTrigger className="w-full text-sm">
                   <SelectValue placeholder="Log Type" />
                 </SelectTrigger>
                 <SelectContent>
@@ -369,7 +403,7 @@ export default function ActivityLogsPage() {
               </Select>
 
               <Select value={actionFilter} onValueChange={setActionFilter}>
-                <SelectTrigger className="w-full">
+                <SelectTrigger className="w-full text-sm">
                   <SelectValue placeholder="Action Type" />
                 </SelectTrigger>
                 <SelectContent>
@@ -383,7 +417,7 @@ export default function ActivityLogsPage() {
               </Select>
 
               <Select value={resourceFilter} onValueChange={setResourceFilter}>
-                <SelectTrigger className="w-full">
+                <SelectTrigger className="w-full text-sm">
                   <SelectValue placeholder="Resource Type" />
                 </SelectTrigger>
                 <SelectContent>
@@ -396,107 +430,175 @@ export default function ActivityLogsPage() {
                 </SelectContent>
               </Select>
             </div>
+          )}
 
-            {/* Mobile Cards Layout */}
-            <div className="block lg:hidden">
-              {loading ? (
-                <div className="text-center py-12">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-                  <p className="text-muted-foreground">Loading activity logs...</p>
-                </div>
-              ) : filteredLogs.length === 0 ? (
-                <div className="text-center py-12">
-                  <Activity className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <p className="text-muted-foreground">No activity logs found matching your criteria.</p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {filteredLogs.map((log) => (
-                    <Card key={log.id} className="border-l-4 border-l-primary/20 hover:border-l-primary/40 transition-colors">
-                      <CardContent className="p-4">
-                        <div className="space-y-3">
-                          {/* Header with Action and Resource */}
-                          <div className="flex flex-wrap items-center gap-2">
-                            <Badge className={getActionColor(log.action)} variant="outline">
-                              <span className="flex items-center gap-1 text-xs font-medium">
-                                {getActionIcon(log.action)}
-                                {log.action.toUpperCase()}
-                              </span>
-                            </Badge>
-                            <Badge variant="outline" className="text-xs bg-muted">
-                              {(log.resource || 'unknown').toUpperCase()}
-                            </Badge>
-                            <Badge variant="secondary" className="text-xs">
-                              {log.log_type === 'admin' ? 'Admin' : 'User'}
-                            </Badge>
+          {/* Mobile Cards Layout */}
+          <div className="block lg:hidden">
+            {filteredLogs.length === 0 ? (
+              <div className="text-center py-8">
+                <Activity className="h-8 w-8 text-muted-foreground mx-auto mb-4" />
+                <p className="text-sm text-muted-foreground">No activity logs found matching your criteria.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {filteredLogs.map((log) => (
+                  <Card key={log.id} className="border-l-4 border-l-primary/20 hover:border-l-primary/40 transition-colors">
+                    <CardContent className="p-4">
+                      <div className="space-y-3">
+                        {/* Header with Action and Resource */}
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Badge className={getActionColor(log.action)} variant="outline">
+                            <span className="flex items-center gap-1 text-xs font-medium">
+                              {getActionIcon(log.action)}
+                              <span className="hidden sm:inline">{log.action.toUpperCase()}</span>
+                              <span className="sm:hidden">{log.action.substring(0, 6).toUpperCase()}</span>
+                            </span>
+                          </Badge>
+                          <Badge variant="outline" className="text-xs bg-muted">
+                            <span className="hidden sm:inline">{(log.resource || 'unknown').toUpperCase()}</span>
+                            <span className="sm:hidden">{(log.resource || 'unknown').substring(0, 4).toUpperCase()}</span>
+                          </Badge>
+                          <Badge variant="secondary" className="text-xs">
+                            {log.log_type === 'admin' ? 'Admin' : 'User'}
+                          </Badge>
+                        </div>
+
+                        {/* User/Admin Info */}
+                        <div className="space-y-1">
+                          <div className="font-semibold text-sm text-foreground truncate">
+                            {log.log_type === 'admin' ? log.admin_name : log.user_name}
                           </div>
+                          <div className="text-xs text-muted-foreground truncate">
+                            {log.log_type === 'admin' ? log.admin_email : log.user_email}
+                          </div>
+                        </div>
 
-                          {/* User/Admin Info */}
-                          <div className="space-y-1">
-                            <div className="font-semibold text-sm text-foreground">
-                              {log.log_type === 'admin' ? log.admin_name : log.user_name}
-                            </div>
-                            <div className="text-xs text-muted-foreground">
-                              {log.log_type === 'admin' ? log.admin_email : log.user_email}
+                        {/* Details */}
+                        <div className="bg-muted/30 p-3 rounded-lg">
+                          <div className="text-xs font-medium text-muted-foreground mb-1">Details:</div>
+                          <div className="text-sm break-words leading-relaxed">{log.details}</div>
+                        </div>
+
+                        {/* Meta Information */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                          <div>
+                            <span className="text-muted-foreground">IP Address:</span>
+                            <div className="font-mono bg-muted px-2 py-1 rounded mt-1 break-all text-xs truncate" title={log.ip_address}>
+                              {log.ip_address}
                             </div>
                           </div>
-
-                          {/* Details */}
-                          <div className="bg-muted/30 p-3 rounded-lg">
-                            <div className="text-xs font-medium text-muted-foreground mb-1">Details:</div>
-                            <div className="text-sm break-words">{log.details}</div>
-                          </div>
-
-                          {/* Meta Information */}
-                          <div className="grid grid-cols-2 gap-3 text-xs">
-                            <div>
-                              <span className="text-muted-foreground">IP:</span>
-                              <div className="font-mono bg-muted px-2 py-1 rounded mt-1 break-all">
-                                {log.ip_address}
-                              </div>
-                            </div>
-                            <div>
-                              <span className="text-muted-foreground">Date:</span>
-                              <div className="font-medium mt-1">
-                                {formatDate(log.created_at)}
-                              </div>
+                          <div>
+                            <span className="text-muted-foreground">Date:</span>
+                            <div className="font-medium mt-1 text-xs truncate" title={formatDate(log.created_at)}>
+                              {formatDate(log.created_at)}
                             </div>
                           </div>
                         </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              )}
-            </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </div>
 
-            {/* Desktop Table Layout */}
-            <div className="hidden lg:block">
-              <div className="rounded-md border overflow-hidden">
+          {/* Tablet Table Layout - Responsive with horizontal scroll */}
+          <div className="hidden md:block lg:hidden">
+            <div className="rounded-md border overflow-x-auto max-w-full">
+              <div className="min-w-[600px]">
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-muted/50">
-                      <TableHead className="w-48 font-medium">User/Admin</TableHead>
-                      <TableHead className="w-24 font-medium">Action</TableHead>
-                      <TableHead className="w-24 font-medium">Resource</TableHead>
-                      <TableHead className="min-w-0 font-medium">Details</TableHead>
-                      <TableHead className="w-32 font-medium">IP Address</TableHead>
-                      <TableHead className="w-40 font-medium">Date</TableHead>
+                      <TableHead className="w-28 font-medium text-sm">User/Admin</TableHead>
+                      <TableHead className="w-16 font-medium text-sm">Action</TableHead>
+                      <TableHead className="w-16 font-medium text-sm">Resource</TableHead>
+                      <TableHead className="min-w-[150px] font-medium text-sm">Details</TableHead>
+                      <TableHead className="w-24 font-medium text-sm">IP</TableHead>
+                      <TableHead className="w-28 font-medium text-sm">Date</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {loading ? (
+                    {filteredLogs.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={6} className="text-center py-12">
-                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-                          <p className="text-muted-foreground">Loading activity logs...</p>
+                        <TableCell colSpan={6} className="text-center py-8">
+                          <Activity className="h-8 w-8 text-muted-foreground mx-auto mb-4" />
+                          <p className="text-sm text-muted-foreground">No activity logs found matching your criteria.</p>
                         </TableCell>
                       </TableRow>
-                    ) : filteredLogs.length === 0 ? (
+                    ) : (
+                      filteredLogs.map((log) => (
+                        <TableRow key={log.id} className="hover:bg-muted/50">
+                          <TableCell className="py-2">
+                            <div className="space-y-1">
+                              <div className="font-medium text-sm truncate max-w-[100px]">
+                                {log.log_type === 'admin' ? log.admin_name : log.user_name}
+                              </div>
+                              <div className="text-xs text-muted-foreground truncate max-w-[100px]">
+                                {log.log_type === 'admin' ? log.admin_email : log.user_email}
+                              </div>
+                              <Badge variant="secondary" className="text-xs">
+                                {log.log_type === 'admin' ? 'Admin' : 'User'}
+                              </Badge>
+                            </div>
+                          </TableCell>
+                          <TableCell className="py-2">
+                            <Badge className={getActionColor(log.action)} variant="outline">
+                              <span className="flex items-center gap-1 text-xs">
+                                {getActionIcon(log.action)}
+                                <span className="truncate max-w-[50px]">{log.action.toUpperCase()}</span>
+                              </span>
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="py-2">
+                            <Badge variant="outline" className="text-xs bg-muted">
+                              <span className="truncate max-w-[50px]">{(log.resource || 'unknown').toUpperCase()}</span>
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="py-2">
+                            <div className="text-sm truncate max-w-[140px]" title={log.details}>
+                              {log.details}
+                            </div>
+                          </TableCell>
+                          <TableCell className="py-2">
+                            <code className="text-xs bg-muted px-2 py-1 rounded font-mono truncate max-w-[80px] block" title={log.ip_address}>
+                              {log.ip_address}
+                            </code>
+                          </TableCell>
+                          <TableCell className="py-2">
+                            <div className="text-sm text-muted-foreground truncate max-w-[100px]">
+                              {formatDate(log.created_at)}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          </div>
+
+          {/* Desktop Table Layout */}
+          <div className="hidden lg:block">
+            <div className="rounded-md border overflow-x-auto max-w-full">
+              <div className="min-w-[800px]">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/50">
+                      <TableHead className="w-32 font-medium text-sm">User/Admin</TableHead>
+                      <TableHead className="w-20 font-medium text-sm">Action</TableHead>
+                      <TableHead className="w-20 font-medium text-sm">Resource</TableHead>
+                      <TableHead className="min-w-[200px] font-medium text-sm">Details</TableHead>
+                      <TableHead className="w-28 font-medium text-sm">IP Address</TableHead>
+                      <TableHead className="w-32 font-medium text-sm">Date</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredLogs.length === 0 ? (
                       <TableRow>
                         <TableCell colSpan={6} className="text-center py-12">
-                          <Activity className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                          <p className="text-muted-foreground">No activity logs found matching your criteria.</p>
+                          <Activity className="h-8 w-8 text-muted-foreground mx-auto mb-4" />
+                          <p className="text-sm text-muted-foreground">No activity logs found matching your criteria.</p>
                         </TableCell>
                       </TableRow>
                     ) : (
@@ -504,10 +606,10 @@ export default function ActivityLogsPage() {
                         <TableRow key={log.id} className="hover:bg-muted/50">
                           <TableCell className="py-3">
                             <div className="space-y-1">
-                              <div className="font-medium text-sm">
+                              <div className="font-medium text-sm truncate max-w-[120px]">
                                 {log.log_type === 'admin' ? log.admin_name : log.user_name}
                               </div>
-                              <div className="text-xs text-muted-foreground">
+                              <div className="text-xs text-muted-foreground truncate max-w-[120px]">
                                 {log.log_type === 'admin' ? log.admin_email : log.user_email}
                               </div>
                               <Badge variant="secondary" className="text-xs">
@@ -519,27 +621,27 @@ export default function ActivityLogsPage() {
                             <Badge className={getActionColor(log.action)} variant="outline">
                               <span className="flex items-center gap-1 text-xs">
                                 {getActionIcon(log.action)}
-                                {log.action.toUpperCase()}
+                                <span className="truncate max-w-[60px]">{log.action.toUpperCase()}</span>
                               </span>
                             </Badge>
                           </TableCell>
                           <TableCell className="py-3">
                             <Badge variant="outline" className="text-xs bg-muted">
-                              {(log.resource || 'unknown').toUpperCase()}
+                              <span className="truncate max-w-[60px]">{(log.resource || 'unknown').toUpperCase()}</span>
                             </Badge>
                           </TableCell>
-                          <TableCell className="py-3 max-w-xs">
-                            <div className="text-sm" title={log.details}>
+                          <TableCell className="py-3">
+                            <div className="text-sm truncate max-w-[180px]" title={log.details}>
                               {log.details}
                             </div>
                           </TableCell>
                           <TableCell className="py-3">
-                            <code className="text-xs bg-muted px-2 py-1 rounded font-mono">
+                            <code className="text-xs bg-muted px-2 py-1 rounded font-mono truncate max-w-[100px] block" title={log.ip_address}>
                               {log.ip_address}
                             </code>
                           </TableCell>
                           <TableCell className="py-3">
-                            <div className="text-sm text-muted-foreground">
+                            <div className="text-sm text-muted-foreground truncate max-w-[120px]">
                               {formatDate(log.created_at)}
                             </div>
                           </TableCell>
@@ -550,38 +652,38 @@ export default function ActivityLogsPage() {
                 </Table>
               </div>
             </div>
+          </div>
 
-            {/* Pagination - Mobile First */}
-            {totalPages > 1 && (
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t">
-                <div className="text-sm text-muted-foreground text-center sm:text-left">
-                  Page {currentPage} of {totalPages} • {totalLogs.toLocaleString()} total logs
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                    disabled={currentPage === 1}
-                    className="px-4"
-                  >
-                    Previous
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-                    disabled={currentPage === totalPages}
-                    className="px-4"
-                  >
-                    Next
-                  </Button>
-                </div>
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t">
+              <div className="text-sm text-muted-foreground text-center sm:text-left">
+                Page {currentPage} of {totalPages} • {totalLogs.toLocaleString()} total logs
               </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                  disabled={currentPage === 1}
+                  className="px-4 text-sm"
+                >
+                  Previous
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                  disabled={currentPage === totalPages}
+                  className="px-4 text-sm"
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   )
 }
